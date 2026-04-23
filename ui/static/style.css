@@ -321,6 +321,24 @@ footer a:hover{color:var(--accent)}
   font-size:0.9rem;
   color:var(--text-muted);
   margin-bottom:1.25rem;
+  word-break:break-word;
+}
+.error-source{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  max-width:100%;
+}
+.error-source a{
+  color:var(--text);
+  text-decoration:none;
+}
+.error-source a:hover{
+  color:var(--accent);
+  text-decoration:underline;
+}
+.error-source a:hover .source-path{
+  color:var(--accent);
 }
 
 .bookmarklet{

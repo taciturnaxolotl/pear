@@ -16,7 +16,7 @@
     <div class="error-box">
       <h3>Could not extract recipe</h3>
       <p>{{.Error}}</p>
-      <a class="btn-secondary" href="{{.SourceURL}}" target="_blank" rel="noopener">Open original page &#8599;</a>
+      <p class="error-source">You can view the original page at <a href="{{.SourceURL}}" target="_blank" rel="noopener">{{with cleanSource .SourceURL}}{{.host}}{{if .path}}<span class="source-path">{{.path}}</span>{{end}}{{end}}</a></p>
     </div>
   </div>
   <footer>

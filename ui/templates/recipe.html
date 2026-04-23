@@ -82,13 +82,18 @@ function saveChecks() {
   document.querySelectorAll('.ingredient-list li').forEach(li => {
     state[li.id] = li.classList.contains('checked');
   });
-  localStorage.setItem(location.pathname, JSON.stringify(state));
+  localStorage.setItem('pare:' + new URL(location.href).searchParams.get('url'), JSON.stringify({t: Date.now(), s: state}));
 }
 
 function loadChecks() {
   try {
-    const state = JSON.parse(localStorage.getItem(location.pathname) || '{}');
-    Object.entries(state).forEach(([id, checked]) => {
+    const raw = JSON.parse(localStorage.getItem('pare:' + new URL(location.href).searchParams.get('url')) || 'null');
+    if (!raw) return;
+    if (Date.now() - raw.t > 48 * 60 * 60 * 1000) {
+      localStorage.removeItem('pare:' + new URL(location.href).searchParams.get('url'));
+      return;
+    }
+    Object.entries(raw.s).forEach(([id, checked]) => {
       const li = document.getElementById(id);
       if (li && checked) {
         li.classList.add('checked');

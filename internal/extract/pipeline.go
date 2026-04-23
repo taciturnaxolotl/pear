@@ -41,13 +41,19 @@ func (p *Pipeline) Extract(targetURL string) *Result {
 		return &Result{Recipe: recipe}
 	}
 
+	if recipe, ok := schema.ExtractMicrodata(body); ok {
+		recipe.SourceURL = targetURL
+		recipe.SourceDomain = domainOf(targetURL)
+		return &Result{Recipe: recipe}
+	}
+
 	if recipe, ok := hrecipe.Extract(body); ok {
 		recipe.SourceURL = targetURL
 		recipe.SourceDomain = domainOf(targetURL)
 		return &Result{Recipe: recipe}
 	}
 
-	return &Result{Error: fmt.Errorf("no recipe found on page — tried JSON-LD and h-recipe extraction")}
+	return &Result{Error: fmt.Errorf("no recipe found on page — tried JSON-LD, microdata, and h-recipe extraction")}
 }
 
 func (p *Pipeline) fetch(url string) (string, error) {

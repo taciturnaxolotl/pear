@@ -232,6 +232,9 @@ func cleanSource(rawURL string) map[string]string {
 	if path == "/" {
 		path = ""
 	}
+	if len(path) > 35 {
+		path = path[:32] + "…"
+	}
 	return map[string]string{"host": host, "path": path}
 }
 

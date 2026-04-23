@@ -1,0 +1,9 @@
+tmp/
+.env
+*.exe
+*.test
+*.out
+pare
+.DS_Store
+build-errors.log
+pare.db*

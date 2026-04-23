@@ -1,0 +1,97 @@
+{{define "recipe_page"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>pare - {{.Recipe.Name}}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/" class="wordmark">pare</a>
+  </nav>
+  <div class="page">
+{{if .Recipe.ImageURL}}
+<img class="recipe-image" src="{{.Recipe.ImageURL}}" alt="{{.Recipe.Name}}" referrerpolicy="no-referrer">
+{{end}}
+
+<div class="recipe-header">
+  <h2>{{.Recipe.Name}}</h2>
+  <div class="recipe-meta">
+    {{if .Recipe.PrepTime}}<span>&#9201; {{fmtDuration .Recipe.PrepTime}} prep</span>{{end}}
+    {{if .Recipe.CookTime}}<span>&#9201; {{fmtDuration .Recipe.CookTime}} cook</span>{{end}}
+    {{if .Recipe.Yield}}<span>Serves {{.Recipe.Yield}}</span>{{end}}
+  </div>
+  {{if .Recipe.Description}}<p class="description">{{.Recipe.Description}}</p>{{end}}
+</div>
+
+{{if .Recipe.Ingredients}}
+<div class="section">
+  <h3>Ingredients</h3>
+  <ul class="ingredient-list">
+    {{range $i, $ing := .Recipe.Ingredients}}
+    <li id="ing-{{$i}}" onclick="toggleCheck(this)">
+      <input type="checkbox" id="cb-{{$i}}">
+      <label for="cb-{{$i}}">{{$ing.RawText}}</label>
+    </li>
+    {{end}}
+  </ul>
+</div>
+{{end}}
+
+{{if .Recipe.Instructions}}
+<div class="section">
+  <h3>Instructions</h3>
+  <ol class="instruction-list">
+    {{range .Recipe.Instructions}}
+    <li>{{.Text}}</li>
+    {{end}}
+  </ol>
+</div>
+{{end}}
+
+<div class="actions">
+  <a class="btn-primary" href="/export.cook?url={{.TargetURL | urlquery}}">Download .cook</a>
+  <a class="btn-secondary" href="{{.Recipe.SourceURL}}" target="_blank" rel="noopener">{{.Recipe.SourceDomain}} &#8599;</a>
+</div>
+
+<script>
+function toggleCheck(li) {
+  const cb = li.querySelector('input[type="checkbox"]');
+  cb.checked = !cb.checked;
+  li.classList.toggle('checked', cb.checked);
+  saveChecks();
+}
+
+function saveChecks() {
+  const state = {};
+  document.querySelectorAll('.ingredient-list li').forEach(li => {
+    state[li.id] = li.classList.contains('checked');
+  });
+  localStorage.setItem(location.pathname, JSON.stringify(state));
+}
+
+function loadChecks() {
+  try {
+    const state = JSON.parse(localStorage.getItem(location.pathname) || '{}');
+    Object.entries(state).forEach(([id, checked]) => {
+      const li = document.getElementById(id);
+      if (li && checked) {
+        li.classList.add('checked');
+        li.querySelector('input[type="checkbox"]').checked = true;
+      }
+    });
+  } catch(e) {}
+}
+
+loadChecks();
+</script>
+  </div>
+  <footer>
+    <span>made by <a href="https://dunkirk.sh">Kieran Klukas</a></span>
+    <a href="https://tangled.org/dunkirk.sh/pare/commit/{{.GitHash}}" class="commit-link">{{.GitHash}}</a>
+  </footer>
+</body>
+</html>
+{{end}}

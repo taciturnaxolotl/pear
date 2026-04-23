@@ -1,0 +1,20 @@
+{{define "base"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{block "title" .}}pare{{end}}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/" class="wordmark">pare</a>
+  </nav>
+  <div class="page">
+    {{block "content" .}}{{end}}
+  </div>
+  <footer>making recipe websites palatable again</footer>
+</body>
+</html>
+{{end}}

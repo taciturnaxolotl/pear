@@ -1,0 +1,31 @@
+{{define "index_page"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>pare</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/" class="wordmark">pare</a>
+  </nav>
+  <div class="page">
+    <div class="hero">
+      <p>paste any recipe URL below to strip it down to what matters</p>
+      <div class="search-form">
+        <form method="GET" action="/">
+          <input type="text" name="url" placeholder="https://www.seriouseats.com/..." value="" autofocus>
+          <button type="submit">pare it</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <footer>
+    <span>made by <a href="https://dunkirk.sh">Kieran Klukas</a></span>
+    <a href="https://tangled.org/dunkirk.sh/pare/commit/{{.GitHash}}" class="commit-link">{{.GitHash}}</a>
+  </footer>
+</body>
+</html>
+{{end}}

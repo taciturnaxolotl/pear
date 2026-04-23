@@ -2,6 +2,7 @@ package cooklang
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -99,7 +100,8 @@ func RenderStepHTML(text string) string {
 		if unit != "" {
 			display = qty + " " + unit
 		}
-		return `<span class="tmr">` + escHTML(display) + `</span>`
+		secs := timerToSeconds(qty, unit)
+		return `<span class="tmr" data-seconds="` + strconv.Itoa(secs) + `">` + escHTML(display) + `</span>`
 	})
 
 	return out
@@ -113,4 +115,19 @@ func escHTML(s string) string {
 	return s
 }
 
-
+func timerToSeconds(qty, unit string) int {
+	v, err := strconv.Atoi(qty)
+	if err != nil {
+		return 0
+	}
+	switch strings.ToLower(unit) {
+	case "second", "seconds":
+		return v
+	case "minute", "minutes", "min", "mins":
+		return v * 60
+	case "hour", "hours", "hr", "hrs", "h":
+		return v * 3600
+	default:
+		return v * 60
+	}
+}

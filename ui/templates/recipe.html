@@ -23,8 +23,8 @@
 <div class="recipe-header">
   <h2>{{.Recipe.Name}}</h2>
   <div class="recipe-meta">
-    {{if .Recipe.PrepTime}}<span class="timer-trigger" data-seconds="{{isoToSeconds .Recipe.PrepTime}}" data-label="Prep">&#9201; {{fmtDuration .Recipe.PrepTime}} prep</span>{{end}}
-    {{if .Recipe.CookTime}}<span class="timer-trigger" data-seconds="{{isoToSeconds .Recipe.CookTime}}" data-label="Cook">&#9201; {{fmtDuration .Recipe.CookTime}} cook</span>{{end}}
+    {{if .Recipe.PrepTime}}<span>⏱ {{fmtDuration .Recipe.PrepTime}} prep</span>{{end}}
+    {{if .Recipe.CookTime}}<span>⏱ {{fmtDuration .Recipe.CookTime}} cook</span>{{end}}
     {{if .Recipe.Yield}}<span>Serves {{.Recipe.Yield}}</span>{{end}}
   </div>
   {{if .Recipe.Description}}<p class="description">{{.Recipe.Description}}</p>{{end}}
@@ -45,6 +45,16 @@
 {{end}}
 
 {{if .Recipe.Instructions}}
+<div id="timer-widget" class="timer-widget">
+  <div class="timer-header">
+    <span class="timer-label" id="timer-label"></span>
+  </div>
+  <div class="timer-display" id="timer-display">00:00</div>
+  <div class="timer-controls">
+    <button class="timer-btn" id="timer-toggle" onclick="toggleTimer()">Start</button>
+    <button class="timer-btn" id="timer-reset" onclick="resetTimer()">Reset</button>
+  </div>
+</div>
 <div class="section">
   <h3>Instructions</h3>
   <ol class="instruction-list">
@@ -57,17 +67,6 @@
 
 <div class="actions">
   <a class="btn-primary" href="/export.cook?url={{.TargetURL | urlquery}}">Download .cook</a>
-</div>
-
-<div id="timer-widget" class="timer-widget hidden">
-  <button class="timer-close" onclick="closeTimer()">&times;</button>
-  <div class="timer-label" id="timer-label"></div>
-  <div class="timer-display" id="timer-display">00:00</div>
-  <div class="timer-controls">
-    <button class="timer-btn" id="timer-start" onclick="startTimer()">Start</button>
-    <button class="timer-btn" id="timer-pause" onclick="pauseTimer()" style="display:none">Pause</button>
-    <button class="timer-btn" id="timer-reset" onclick="resetTimer()">Reset</button>
-  </div>
 </div>
 
 <script>
@@ -105,11 +104,13 @@ loadChecks();
 let timerInterval = null;
 let timerRemaining = 0;
 let timerRunning = false;
+let timerSound = null;
+let timerSoundPlayed = false;
 
-document.querySelectorAll('.timer-trigger').forEach(el => {
+document.querySelectorAll('.tmr').forEach(el => {
   el.addEventListener('click', () => {
     const secs = parseInt(el.dataset.seconds, 10);
-    const label = el.dataset.label;
+    const label = el.textContent;
     if (secs > 0) {
       openTimer(secs, label);
     }
@@ -119,27 +120,42 @@ document.querySelectorAll('.timer-trigger').forEach(el => {
 function openTimer(secs, label) {
   timerRemaining = secs;
   timerRunning = false;
+  timerSoundPlayed = false;
   clearInterval(timerInterval);
   timerInterval = null;
+  if (!timerSound) timerSound = new Audio('/static/timer.mp3');
+  timerSound.pause();
+  timerSound.currentTime = 0;
   document.getElementById('timer-label').textContent = label;
   updateTimerDisplay();
-  document.getElementById('timer-start').style.display = '';
-  document.getElementById('timer-pause').style.display = 'none';
-  document.getElementById('timer-widget').classList.remove('hidden');
+  document.getElementById('timer-toggle').textContent = 'Start';
+  document.getElementById('timer-widget').classList.add('timer-open');
+}
+
+function toggleTimer() {
+  if (timerRunning) {
+    pauseTimer();
+  } else {
+    startTimer();
+  }
 }
 
 function startTimer() {
   if (timerRunning) return;
   timerRunning = true;
-  document.getElementById('timer-start').style.display = 'none';
-  document.getElementById('timer-pause').style.display = '';
+  document.getElementById('timer-toggle').textContent = 'Pause';
   timerInterval = setInterval(() => {
     timerRemaining--;
     updateTimerDisplay();
+    if (timerRemaining === 2 && !timerSoundPlayed) {
+      timerSoundPlayed = true;
+      timerSound.play();
+    }
     if (timerRemaining <= 0) {
       clearInterval(timerInterval);
       timerInterval = null;
       timerRunning = false;
+      document.getElementById('timer-toggle').textContent = 'Start';
       document.getElementById('timer-display').classList.add('timer-done');
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification('Timer done!', { body: document.getElementById('timer-label').textContent + ' is done!' });
@@ -152,23 +168,23 @@ function pauseTimer() {
   timerRunning = false;
   clearInterval(timerInterval);
   timerInterval = null;
-  document.getElementById('timer-start').style.display = '';
-  document.getElementById('timer-pause').style.display = 'none';
+  document.getElementById('timer-toggle').textContent = 'Unpause';
 }
 
 function resetTimer() {
   clearInterval(timerInterval);
   timerInterval = null;
   timerRunning = false;
-  const triggers = document.querySelectorAll('.timer-trigger');
+  timerSoundPlayed = false;
+  if (timerSound) { timerSound.pause(); timerSound.currentTime = 0; }
+  const triggers = document.querySelectorAll('.tmr');
   if (triggers.length > 0) {
-    const active = [...triggers].find(t => t.dataset.label === document.getElementById('timer-label').textContent);
+    const active = [...triggers].find(t => t.textContent === document.getElementById('timer-label').textContent);
     if (active) {
       timerRemaining = parseInt(active.dataset.seconds, 10);
     }
   }
-  document.getElementById('timer-start').style.display = '';
-  document.getElementById('timer-pause').style.display = 'none';
+  document.getElementById('timer-toggle').textContent = 'Start';
   document.getElementById('timer-display').classList.remove('timer-done');
   updateTimerDisplay();
 }
@@ -177,7 +193,12 @@ function closeTimer() {
   clearInterval(timerInterval);
   timerInterval = null;
   timerRunning = false;
-  document.getElementById('timer-widget').classList.add('hidden');
+  timerSoundPlayed = false;
+  if (timerSound) { timerSound.pause(); timerSound.currentTime = 0; }
+  document.getElementById('timer-widget').classList.remove('timer-open');
+  document.getElementById('timer-display').classList.remove('timer-done');
+  timerRemaining = 0;
+  updateTimerDisplay();
 }
 
 function updateTimerDisplay() {

@@ -213,71 +213,72 @@ footer a:hover{color:var(--accent)}
   font-weight:600;
 }
 
-.timer-trigger{cursor:pointer}
-.timer-trigger:hover{text-decoration:underline}
-
 .timer-widget{
-  position:fixed;
-  bottom:1.5rem;
-  right:1.5rem;
-  background:var(--surface);
-  border:1px solid var(--border);
+  padding:1rem 1.25rem;
+  background:var(--check-bg);
   border-radius:var(--radius);
-  padding:1.25rem;
-  box-shadow:0 4px 24px rgba(0,0,0,0.08);
   text-align:center;
-  z-index:100;
-  min-width:180px;
+  max-height:0;
+  overflow:hidden;
+  opacity:0;
+  transition:max-height 0.3s ease,opacity 0.3s ease,margin 0.3s ease,padding 0.3s ease;
+  margin-bottom:0;
+  padding-top:0;
+  padding-bottom:0;
 }
-.timer-widget.hidden{display:none}
-.timer-close{
-  position:absolute;
-  top:0.4rem;
-  right:0.5rem;
-  background:none;
-  border:none;
-  font-size:1.1rem;
-  cursor:pointer;
-  color:var(--text-muted);
-  line-height:1;
+.timer-widget.timer-open{
+  max-height:200px;
+  opacity:1;
+  margin-bottom:2rem;
+  padding:1rem 1.25rem;
 }
-.timer-close:hover{color:var(--text)}
+}
+.timer-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:0.5rem;
+}
 .timer-label{
   font-family:'Poppins',system-ui,sans-serif;
-  font-size:0.75rem;
+  font-size:0.7rem;
   text-transform:uppercase;
   letter-spacing:0.08em;
   color:var(--text-muted);
-  margin-bottom:0.5rem;
 }
 .timer-display{
   font-family:'Poppins',system-ui,sans-serif;
-  font-size:2.5rem;
+  font-size:2.75rem;
   font-weight:700;
-  letter-spacing:-0.02em;
+  letter-spacing:-0.03em;
   line-height:1;
   margin-bottom:0.75rem;
+  color:var(--text);
 }
 .timer-done{color:var(--accent);animation:pulse 1s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 .timer-controls{
   display:flex;
-  gap:0.4rem;
-  justify-content:center;
+  gap:0.5rem;
 }
 .timer-btn{
-  padding:0.35rem 0.75rem;
+  flex:1;
+  padding:0.4rem 0;
   border:1px solid var(--border);
-  border-radius:4px;
+  border-radius:6px;
   background:var(--surface);
   font-family:'Poppins',system-ui,sans-serif;
-  font-size:0.75rem;
+  font-size:0.7rem;
   cursor:pointer;
+  color:var(--text-muted);
+  transition:background 0.15s,color 0.15s,border-color 0.15s;
 }
-.timer-btn:hover{border-color:var(--accent)}
+.timer-btn:hover{border-color:var(--accent);background:var(--accent);color:#fff}
+.timer-btn:active{transform:scale(0.96)}
 
-.ing{font-weight:500}
-.tmr{font-weight:500}
+.tmr{font-weight:500;cursor:pointer;transition:color 0.2s;white-space:nowrap}
+.tmr:hover{color:var(--accent)}
+.tmr::before{content:"⏲";font-size:0.8em;margin-right:0.4em}
 
 .actions{
   display:flex;

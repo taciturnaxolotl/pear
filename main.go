@@ -256,7 +256,7 @@ func after(s, sep string) string {
 
 func renderStep(text string, ingredients []models.Ingredient) template.HTML {
 	annotated := cooklang.AnnotateStepForDisplay(text, ingredients)
-	return template.HTML(cooklang.RenderStepHTML(annotated))
+	return cooklang.ParseAndRender(annotated)
 }
 
 func recipeToJSONLD(r *models.Recipe) map[string]interface{} {

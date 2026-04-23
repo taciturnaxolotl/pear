@@ -1,110 +1,216 @@
 package cooklang
 
 import (
+	"fmt"
+	"html/template"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
+
+	cooklang "github.com/aquilax/cooklang-go"
 )
 
-type AnnotatedStep struct {
-	Text string
-	Items []AnnotatedItem
-}
-
-type AnnotatedItem struct {
-	Type     string // "ingredient", "timer", "cookware"
-	Name     string
-	Quantity string
-	Unit     string
-}
-
-var parseIngredientRe = regexp.MustCompile(`@([\w\s]+?)\{([^}%]*)(?:%([^}]*))?\}`)
-var parseTimerRe = regexp.MustCompile(`~([\w\s]*?)\{([^}%]*)(?:%([^}]*))?\}`)
-
-func ParseSteps(instructions []string) []AnnotatedStep {
-	var steps []AnnotatedStep
-	for _, text := range instructions {
-		step := AnnotatedStep{Text: text}
-		step.Items = parseAnnotations(text)
-		steps = append(steps, step)
-	}
-	return steps
-}
-
-func parseAnnotations(text string) []AnnotatedItem {
-	var items []AnnotatedItem
-
-	matches := parseIngredientRe.FindAllStringSubmatchIndex(text, -1)
-	for _, m := range matches {
-		name := text[m[2]:m[3]]
-		qty := ""
-		unit := ""
-		if m[4] != -1 {
-			qty = text[m[4]:m[5]]
-		}
-		if m[6] != -1 {
-			unit = text[m[6]:m[7]]
-		}
-		items = append(items, AnnotatedItem{Type: "ingredient", Name: name, Quantity: qty, Unit: unit})
+func ParseAndRender(text string) template.HTML {
+	if strings.TrimSpace(text) == "" {
+		return template.HTML("")
 	}
 
-	matches = parseTimerRe.FindAllStringSubmatchIndex(text, -1)
-	for _, m := range matches {
-		name := ""
-		if m[2] != -1 {
-			name = text[m[2]:m[3]]
-		}
-		qty := ""
-		unit := ""
-		if m[4] != -1 {
-			qty = text[m[4]:m[5]]
-		}
-		if m[6] != -1 {
-			unit = text[m[6]:m[7]]
-		}
-		items = append(items, AnnotatedItem{Type: "timer", Name: name, Quantity: qty, Unit: unit})
+	// Pre-process: replace timer range syntax ~{N-M%unit} with plain text "N-M unit"
+	// since cooklang-go doesn't support range quantities for timers
+	preprocessed := timerRangeSyntaxRe.ReplaceAllString(text, "$1 $2")
+
+	recipe, err := cooklang.ParseString(preprocessed)
+	if err != nil || len(recipe.Steps) == 0 {
+		return regexRender(text)
 	}
 
-	return items
+	var sb strings.Builder
+	for i, step := range recipe.Steps {
+		renderStep(step, &sb)
+		if i < len(recipe.Steps)-1 {
+			sb.WriteString("\n")
+		}
+	}
+	return template.HTML(sb.String())
 }
 
-func RenderStepHTML(text string) string {
+var timerRangeSyntaxRe = regexp.MustCompile(`~\{(\d+-\d+)%(\w+)\}`)
+
+var cooklangIngredientRe = regexp.MustCompile(`@([\w\s/]+)\{[^}]*\}|@([\w/]+)`)
+var cooklangTimerRe = regexp.MustCompile(`~\{(\d+)%(\w+)\}`)
+
+func regexRender(text string) template.HTML {
 	out := text
 
-	out = parseIngredientRe.ReplaceAllStringFunc(out, func(match string) string {
-		parts := parseIngredientRe.FindStringSubmatch(match)
-		name := strings.TrimSpace(parts[1])
-		qty := parts[2]
-		unit := ""
-		if len(parts) >= 4 && parts[3] != "" {
-			unit = parts[3]
+	// Replace @Name{qty%unit} or @Name{qty} or @Name{} with <span class="ing">
+	out = cooklangIngredientRe.ReplaceAllStringFunc(out, func(match string) string {
+		parts := cooklangIngredientRe.FindStringSubmatch(match)
+		name := parts[1]
+		if name == "" {
+			name = parts[2]
 		}
-		display := name
-		if qty != "" {
-			display = qty
-			if unit != "" {
-				display = qty + " " + unit + " " + name
+		name = strings.TrimSpace(name)
+		return fmt.Sprintf(`<span class="ing">%s</span>`, escHTML(name))
+	})
+
+	// Replace ~{qty%unit} with <span class="tmr">
+	out = cooklangTimerRe.ReplaceAllStringFunc(out, func(match string) string {
+		parts := cooklangTimerRe.FindStringSubmatch(match)
+		qty := parts[1]
+		unit := parts[2]
+		display := qty + " " + unit
+		qtyInt, _ := strconv.Atoi(qty)
+		secs := timerSeconds(float64(qtyInt), unit)
+		return fmt.Sprintf(`<span class="tmr" data-seconds="%d">%s</span>`, secs, escHTML(display))
+	})
+
+	// Replace time ranges like "2-3 minutes"
+	out = timeRangeRe.ReplaceAllStringFunc(out, func(match string) string {
+		parts := timeRangeRe.FindStringSubmatch(match)
+		if len(parts) >= 3 {
+			qty := parts[1]
+			unit := parts[2]
+			display := qty + " " + unit
+			secs := timeRangeSeconds(qty, unit)
+			return fmt.Sprintf(`<span class="tmr" data-seconds="%d">%s</span>`, secs, escHTML(display))
+		}
+		return match
+	})
+
+	return template.HTML(out)
+}
+
+type htmlSpan struct {
+	start int
+	end   int
+	html  string
+}
+
+func renderStep(step cooklang.Step, sb *strings.Builder) {
+	dirs := step.Directions
+	if dirs == "" {
+		return
+	}
+
+	var spans []htmlSpan
+
+	for _, ing := range step.Ingredients {
+		display := ing.Name
+		if ing.Amount.QuantityRaw != "" {
+			qty := ing.Amount.QuantityRaw
+			if ing.Amount.Unit != "" {
+				qty = qty + " " + ing.Amount.Unit
 			}
+			display = qty + " " + ing.Name
+		} else if ing.Amount.IsNumeric && ing.Amount.Quantity > 0 && ing.Amount.Quantity != 1 {
+			qty := strconv.FormatFloat(ing.Amount.Quantity, 'f', -1, 64)
+			if ing.Amount.Unit != "" {
+				qty = qty + " " + ing.Amount.Unit
+			}
+			display = qty + " " + ing.Name
 		}
-		return `<span class="ing">` + escHTML(display) + `</span>`
+		idx := strings.Index(dirs, ing.Name)
+		if idx >= 0 {
+			spans = append(spans, htmlSpan{
+				start: idx,
+				end:   idx + len(ing.Name),
+				html:  fmt.Sprintf(`<span class="ing">%s</span>`, escHTML(display)),
+			})
+		}
+	}
+
+	for _, tmr := range step.Timers {
+		search := formatTimerSearch(tmr.Duration, tmr.Unit)
+		display := search
+		secs := timerSeconds(tmr.Duration, tmr.Unit)
+		idx := strings.Index(dirs, search)
+		if idx >= 0 {
+			spans = append(spans, htmlSpan{
+				start: idx,
+				end:   idx + len(search),
+				html:  fmt.Sprintf(`<span class="tmr" data-seconds="%d">%s</span>`, secs, escHTML(display)),
+			})
+		}
+	}
+
+	// Find time patterns not caught by cooklang syntax (e.g. "2-3 minutes", "4-5 seconds")
+	for _, m := range timeRangeRe.FindAllStringSubmatchIndex(dirs, -1) {
+		fullStart, fullEnd := m[0], m[1]
+		qtyStart, qtyEnd := m[2], m[3]
+		unitStart, unitEnd := m[4], m[5]
+		qty := dirs[qtyStart:qtyEnd]
+		unit := dirs[unitStart:unitEnd]
+		display := qty + " " + unit
+		secs := timeRangeSeconds(qty, unit)
+		spans = append(spans, htmlSpan{
+			start: fullStart,
+			end:   fullEnd,
+			html:  fmt.Sprintf(`<span class="tmr" data-seconds="%d">%s</span>`, secs, escHTML(display)),
+		})
+	}
+
+	if len(spans) == 0 {
+		sb.WriteString(escHTML(dirs))
+		return
+	}
+
+	sort.Slice(spans, func(i, j int) bool {
+		return spans[i].start < spans[j].start
 	})
 
-	out = parseTimerRe.ReplaceAllStringFunc(out, func(match string) string {
-		parts := parseTimerRe.FindStringSubmatch(match)
-		qty := parts[2]
-		unit := ""
-		if len(parts) >= 4 && parts[3] != "" {
-			unit = parts[3]
+	filtered := []htmlSpan{spans[0]}
+	for _, s := range spans[1:] {
+		last := &filtered[len(filtered)-1]
+		if s.start >= last.end {
+			filtered = append(filtered, s)
 		}
-		display := qty
+	}
+
+	pos := 0
+	for _, s := range filtered {
+		if s.start > pos {
+			sb.WriteString(escHTML(dirs[pos:s.start]))
+		}
+		sb.WriteString(s.html)
+		pos = s.end
+	}
+	if pos < len(dirs) {
+		sb.WriteString(escHTML(dirs[pos:]))
+	}
+}
+
+func formatTimerSearch(duration float64, unit string) string {
+	if duration == float64(int(duration)) {
+		d := int(duration)
+		s := strconv.Itoa(d)
 		if unit != "" {
-			display = qty + " " + unit
+			return s + " " + unit
 		}
-		secs := timerToSeconds(qty, unit)
-		return `<span class="tmr" data-seconds="` + strconv.Itoa(secs) + `">` + escHTML(display) + `</span>`
-	})
+		return s
+	}
+	s := strconv.FormatFloat(duration, 'f', -1, 64)
+	if unit != "" {
+		return s + " " + unit
+	}
+	return s
+}
 
-	return out
+func timerSeconds(duration float64, unit string) int {
+	d := int(duration)
+	switch strings.ToLower(unit) {
+	case "second", "seconds", "sec", "secs":
+		return d
+	case "minute", "minutes", "min", "mins":
+		return d * 60
+	case "hour", "hours", "hr", "hrs", "h":
+		return d * 3600
+	default:
+		if d == 0 {
+			return 0
+		}
+		return d * 60
+	}
 }
 
 func escHTML(s string) string {
@@ -115,19 +221,29 @@ func escHTML(s string) string {
 	return s
 }
 
-func timerToSeconds(qty, unit string) int {
-	v, err := strconv.Atoi(qty)
+func RenderStepHTML(text string) string {
+	return string(ParseAndRender(text))
+}
+
+var timeRangeRe = regexp.MustCompile(`(?i)\b(\d+-\d+)\s+(seconds?|minutes?|mins?|hours?|hrs?|h)\b`)
+
+func timeRangeSeconds(qty, unit string) int {
+	parts := strings.SplitN(qty, "-", 2)
+	if len(parts) != 2 {
+		return 0
+	}
+	hi, err := strconv.Atoi(parts[1])
 	if err != nil {
 		return 0
 	}
 	switch strings.ToLower(unit) {
-	case "second", "seconds":
-		return v
+	case "second", "seconds", "sec", "secs":
+		return hi
 	case "minute", "minutes", "min", "mins":
-		return v * 60
+		return hi * 60
 	case "hour", "hours", "hr", "hrs", "h":
-		return v * 3600
+		return hi * 3600
 	default:
-		return v * 60
+		return hi * 60
 	}
 }

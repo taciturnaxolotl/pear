@@ -60,7 +60,8 @@ func Export(recipe *models.Recipe) string {
 	return sb.String()
 }
 
-var timeRe = regexp.MustCompile(`(?i)\b(\d+)\s*(seconds?|minutes?|mins?|hours?|hrs?|h)\b`)
+var timeRangeExportRe = regexp.MustCompile(`(?i)\b(\d+-\d+)\s*(seconds?|minutes?|mins?|hours?|hrs?|h)\b`)
+var timeRe = regexp.MustCompile(`(?i)(^|[^0-9-])(\d+)\s*(seconds?|minutes?|mins?|hours?|hrs?|h)\b`)
 
 func AnnotateStepForDisplay(text string, ingredients []models.Ingredient) string {
 	index := buildIngredientIndex(ingredients)
@@ -117,13 +118,25 @@ func annotateStep(text string, ingredients map[string]models.Ingredient) (string
 		annotated = annotated[:m.start] + m.repl + annotated[m.end:]
 	}
 
-	annotated = timeRe.ReplaceAllStringFunc(annotated, func(matchStr string) string {
-		parts := timeRe.FindStringSubmatch(matchStr)
+	annotated = timeRangeExportRe.ReplaceAllStringFunc(annotated, func(matchStr string) string {
+		parts := timeRangeExportRe.FindStringSubmatch(matchStr)
 		if len(parts) >= 3 {
 			qty := parts[1]
 			unit := parts[2]
 			unit = normalizeTimeUnit(unit)
 			return fmt.Sprintf("~{%s%%%s}", qty, unit)
+		}
+		return matchStr
+	})
+
+	annotated = timeRe.ReplaceAllStringFunc(annotated, func(matchStr string) string {
+		parts := timeRe.FindStringSubmatch(matchStr)
+		if len(parts) >= 4 {
+			leading := parts[1]
+			qty := parts[2]
+			unit := parts[3]
+			unit = normalizeTimeUnit(unit)
+			return leading + fmt.Sprintf("~{%s%%%s}", qty, unit)
 		}
 		return matchStr
 	})

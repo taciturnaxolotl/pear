@@ -27,6 +27,8 @@ func Extract(body string) (*models.Recipe, bool) {
 	}
 	if summary := findTextByClass(recipeNode, "p-summary"); summary != "" {
 		recipe.Description = summary
+	} else if desc := findDescriptionFallback(recipeNode); desc != "" {
+		recipe.Description = desc
 	}
 	if yield := findTextByClass(recipeNode, "p-yield"); yield != "" {
 		recipe.Yield = yield
@@ -58,6 +60,29 @@ func Extract(body string) (*models.Recipe, bool) {
 	}
 
 	return recipe, true
+}
+
+func findDescriptionFallback(n *html.Node) string {
+	var f func(*html.Node) string
+	f = func(n *html.Node) string {
+		if n.Type == html.ElementNode {
+			if n.Data == "aside" || n.Data == "p" {
+				if !hasClass(n, "p-ingredient") && !hasClass(n, "e-instructions") && !hasClass(n, "p-name") && !hasClass(n, "p-yield") && !hasClass(n, "dt-duration") {
+					text := textContent(n)
+					if len(text) > 20 {
+						return text
+					}
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if result := f(c); result != "" {
+				return result
+			}
+		}
+		return ""
+	}
+	return f(n)
 }
 
 func findByClass(n *html.Node, class string) *html.Node {

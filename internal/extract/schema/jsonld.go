@@ -22,11 +22,46 @@ func Extract(body string) (*models.Recipe, bool) {
 		recipe := parseJSONLD(node)
 		if recipe != nil {
 			recipe.ExtractionMethod = "schema.org"
+			if recipe.Description == "" {
+				recipe.Description = findMetaDescription(doc)
+			}
 			return recipe, true
 		}
 	}
 
 	return nil, false
+}
+
+func findMetaDescription(n *html.Node) string {
+	var f func(*html.Node) string
+	f = func(n *html.Node) string {
+		if n.Type == html.ElementNode && n.Data == "meta" {
+			name := ""
+			prop := ""
+			content := ""
+			for _, a := range n.Attr {
+				if a.Key == "name" {
+					name = a.Val
+				}
+				if a.Key == "property" {
+					prop = a.Val
+				}
+				if a.Key == "content" {
+					content = a.Val
+				}
+			}
+			if name == "description" || prop == "og:description" {
+				return content
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if desc := f(c); desc != "" {
+				return desc
+			}
+		}
+		return ""
+	}
+	return f(n)
 }
 
 func findJSONLDScripts(n *html.Node) []string {

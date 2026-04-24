@@ -3,6 +3,7 @@ package schema
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -370,6 +371,7 @@ func ParseIngredient(text string) models.Ingredient {
 
 func parseIngredient(text string) models.Ingredient {
 	text = strings.TrimSpace(text)
+	text = prettifyQuantities(text)
 
 	if m := ingredientRangeRe.FindStringSubmatch(text); len(m) == 4 {
 		return models.Ingredient{RawText: text, Quantity: m[1], Unit: m[2], Name: m[3]}
@@ -385,6 +387,54 @@ func parseIngredient(text string) models.Ingredient {
 		return models.Ingredient{RawText: text, Quantity: m[1], Name: m[2]}
 	}
 	return models.Ingredient{RawText: text}
+}
+
+var decimalRe = regexp.MustCompile(`\b(\d+\.\d+)\b`)
+
+func prettifyQuantities(text string) string {
+	return decimalRe.ReplaceAllStringFunc(text, func(match string) string {
+		f, err := strconv.ParseFloat(match, 64)
+		if err != nil {
+			return match
+		}
+		if pretty := decimalToFraction(f); pretty != "" {
+			return pretty
+		}
+		return match
+	})
+}
+
+func decimalToFraction(f float64) string {
+	// Common cooking fractions
+	fracs := map[float64]string{
+		0.125:  "⅛",
+		0.25:   "¼",
+		0.333:  "⅓",
+		0.5:    "½",
+		0.667:  "⅔",
+		0.75:   "¾",
+		1.5:    "1½",
+		2.5:    "2½",
+		3.5:    "3½",
+		4.5:    "4½",
+		0.1667: "⅙",
+	}
+	for k, v := range fracs {
+		if math.Abs(f-k) < 0.01 {
+			return v
+		}
+	}
+	// Try whole + fraction
+	whole := math.Floor(f)
+	frac := f - whole
+	if whole > 0 && frac > 0.01 {
+		for k, v := range fracs {
+			if k < 1 && math.Abs(frac-k) < 0.01 {
+				return fmt.Sprintf("%d%s", int(whole), v)
+			}
+		}
+	}
+	return ""
 }
 
 func extractInstructions(m map[string]interface{}) []models.Instruction {

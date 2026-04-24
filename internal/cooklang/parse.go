@@ -11,6 +11,158 @@ import (
 	cooklang "github.com/aquilax/cooklang-go"
 )
 
+func Highlight(raw string) template.HTML {
+	if strings.TrimSpace(raw) == "" {
+		return template.HTML("")
+	}
+
+	var buf strings.Builder
+	lines := strings.Split(raw, "\n")
+	for i, line := range lines {
+		buf.WriteString(highlightLine(line))
+		if i < len(lines)-1 {
+			buf.WriteByte('\n')
+		}
+	}
+	return template.HTML(buf.String())
+}
+
+var metaDelimRe = regexp.MustCompile(`^---\s*$`)
+var metaKVRe = regexp.MustCompile(`^(\w+):\s*(.*)$`)
+var sectionRe = regexp.MustCompile(`^==\s+.+\s+==\s*$`)
+
+func highlightLine(line string) string {
+	if metaDelimRe.MatchString(line) {
+		return `<span class="ck-delim">---</span>`
+	}
+	if m := metaKVRe.FindStringSubmatch(line); m != nil {
+		if m[2] != "" {
+			return `<span class="ck-key">` + escHTML(m[1]) + `:</span> <span class="ck-val">` + escHTML(m[2]) + `</span>`
+		}
+		return `<span class="ck-key">` + escHTML(m[1]) + `:</span>`
+	}
+	if sectionRe.MatchString(line) {
+		return `<span class="ck-section">` + escHTML(line) + `</span>`
+	}
+	return highlightCookSyntax(line)
+}
+
+func highlightCookSyntax(line string) string {
+	preprocessed := timerRangeSyntaxRe.ReplaceAllString(line, "$1 $2")
+	recipe, err := cooklang.ParseString(preprocessed)
+	if err != nil || len(recipe.Steps) == 0 {
+		return regexHighlight(line)
+	}
+
+	type span struct {
+		start int
+		end   int
+		html  string
+	}
+
+	var spans []span
+	for _, step := range recipe.Steps {
+		dirs := step.Directions
+		for _, ing := range step.Ingredients {
+			idx := strings.Index(dirs, ing.Name)
+			if idx >= 0 {
+				name := escHTML(ing.Name)
+				if ing.Amount.QuantityRaw != "" {
+					qty := escHTML(ing.Amount.QuantityRaw)
+					if ing.Amount.Unit != "" {
+						unit := escHTML(ing.Amount.Unit)
+						spans = append(spans, span{idx, idx + len(ing.Name),
+							fmt.Sprintf(`<span class="ck-ing">@%s{<span class="ck-qty">%s</span>%%<span class="ck-unit">%s</span>}</span>`, name, qty, unit)})
+					} else {
+						spans = append(spans, span{idx, idx + len(ing.Name),
+							fmt.Sprintf(`<span class="ck-ing">@%s{<span class="ck-qty">%s</span>}</span>`, name, qty)})
+					}
+				} else {
+					spans = append(spans, span{idx, idx + len(ing.Name),
+						fmt.Sprintf(`<span class="ck-ing">@%s</span>`, name)})
+				}
+			}
+		}
+		for _, tmr := range step.Timers {
+			search := formatTimerSearch(tmr.Duration, tmr.Unit)
+			idx := strings.Index(dirs, search)
+			if idx >= 0 {
+				qty := escHTML(strconv.FormatFloat(tmr.Duration, 'f', -1, 64))
+				unit := escHTML(tmr.Unit)
+				if unit != "" {
+					spans = append(spans, span{idx, idx + len(search),
+						fmt.Sprintf(`<span class="ck-tmr">~{<span class="ck-qty">%s</span>%%<span class="ck-unit">%s</span>}</span>`, qty, unit)})
+				} else {
+					spans = append(spans, span{idx, idx + len(search),
+						fmt.Sprintf(`<span class="ck-tmr">~{<span class="ck-qty">%s</span>}</span>`, qty)})
+				}
+			}
+		}
+	}
+
+	if len(spans) == 0 {
+		return escHTML(line)
+	}
+
+	sort.Slice(spans, func(i, j int) bool { return spans[i].start < spans[j].start })
+	filtered := []span{spans[0]}
+	for _, s := range spans[1:] {
+		last := &filtered[len(filtered)-1]
+		if s.start >= last.end {
+			filtered = append(filtered, s)
+		}
+	}
+
+	dirs := recipe.Steps[0].Directions
+	var buf strings.Builder
+	pos := 0
+	for _, s := range filtered {
+		if s.start > pos {
+			buf.WriteString(escHTML(dirs[pos:s.start]))
+		}
+		buf.WriteString(s.html)
+		pos = s.end
+	}
+	if pos < len(dirs) {
+		buf.WriteString(escHTML(dirs[pos:]))
+	}
+	return buf.String()
+}
+
+var hlIngredientRe = regexp.MustCompile(`@([\w\s/]+)\{([^}%]*)(?:%([^}]*))?\}|@([\w/]+)`)
+var hlTimerRe = regexp.MustCompile(`~\{([^%]*)(?:%([^}]*))?\}`)
+
+func regexHighlight(line string) string {
+	out := escHTML(line)
+	out = hlIngredientRe.ReplaceAllStringFunc(out, func(match string) string {
+		parts := hlIngredientRe.FindStringSubmatch(match)
+		name := parts[1]
+		if name == "" {
+			name = parts[4]
+		}
+		name = strings.TrimSpace(name)
+		qty := parts[2]
+		unit := parts[3]
+		if qty != "" && unit != "" {
+			return fmt.Sprintf(`<span class="ck-ing">@%s{<span class="ck-qty">%s</span>%%<span class="ck-unit">%s</span>}</span>`, escHTML(name), escHTML(qty), escHTML(unit))
+		}
+		if qty != "" {
+			return fmt.Sprintf(`<span class="ck-ing">@%s{<span class="ck-qty">%s</span>}</span>`, escHTML(name), escHTML(qty))
+		}
+		return fmt.Sprintf(`<span class="ck-ing">@%s</span>`, escHTML(name))
+	})
+	out = hlTimerRe.ReplaceAllStringFunc(out, func(match string) string {
+		parts := hlTimerRe.FindStringSubmatch(match)
+		qty := parts[1]
+		unit := parts[2]
+		if unit != "" {
+			return fmt.Sprintf(`<span class="ck-tmr">~{<span class="ck-qty">%s</span>%%<span class="ck-unit">%s</span>}</span>`, escHTML(qty), escHTML(unit))
+		}
+		return fmt.Sprintf(`<span class="ck-tmr">~{<span class="ck-qty">%s</span>}</span>`, escHTML(qty))
+	})
+	return out
+}
+
 func ParseAndRender(text string) template.HTML {
 	if strings.TrimSpace(text) == "" {
 		return template.HTML("")

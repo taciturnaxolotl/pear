@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"html/template"
@@ -52,6 +53,9 @@ func main() {
 		"isoToSeconds": isoToSeconds,
 		"cleanSource": cleanSource,
 		"renderStep":  renderStep,
+		"cookHighlight": cookHighlight,
+		"groupIngredients": groupIngredients,
+		"json":        func(v string) string { b, _ := json.Marshal(v); return string(b) },
 		"trimProto":   func(s string) string { return strings.TrimPrefix(strings.TrimPrefix(s, "https://"), "http://") },
 	}).ParseFS(ui.Templates, "templates/*.html")
 	if err != nil {
@@ -79,6 +83,7 @@ func main() {
 	}
 
 	r.Get("/", srv.handleIndex)
+	r.Get("/cook", srv.handleCookView)
 	r.Get("/export.cook", srv.handleCookExport)
 	r.Get("/recipe", srv.handleRecipeQuery)
 	r.Get("/status", srv.handleStatus)
@@ -279,14 +284,54 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) renderRecipe(w http.ResponseWriter, recipe *models.Recipe, targetURL string) {
+	filename := strings.ReplaceAll(recipe.Name, " ", "-") + ".cook"
 	data := map[string]interface{}{
 		"Recipe":     recipe,
 		"TargetURL": targetURL,
+		"Filename":  filename,
 		"GitHash":    s.gitHash,
 		"BaseURL":    s.baseURL,
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	s.templates.ExecuteTemplate(w, "recipe_page", data)
+}
+
+func (s *Server) handleCookView(w http.ResponseWriter, r *http.Request) {
+	targetURL := r.URL.Query().Get("url")
+	if targetURL == "" {
+		http.Error(w, "missing url parameter", http.StatusBadRequest)
+		return
+	}
+	if !strings.HasPrefix(targetURL, "http://") && !strings.HasPrefix(targetURL, "https://") {
+		targetURL = "https://" + targetURL
+	}
+
+	recipe, err := s.cache.Get(targetURL)
+	if err != nil {
+		log.Printf("cache read error: %v", err)
+	}
+	if recipe == nil {
+		result := s.pipeline.Extract(targetURL)
+		if result.Error != nil {
+			s.renderError(w, result.Error.Error(), targetURL)
+			return
+		}
+		recipe = result.Recipe
+	}
+
+	cook := cooklang.Export(recipe)
+	filename := strings.ReplaceAll(recipe.Name, " ", "-") + ".cook"
+
+	data := map[string]interface{}{
+		"Recipe":     recipe,
+		"TargetURL":  targetURL,
+		"CookFile":   cook,
+		"Filename":  filename,
+		"GitHash":    s.gitHash,
+		"BaseURL":   s.baseURL,
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	s.templates.ExecuteTemplate(w, "cook_page", data)
 }
 
 func (s *Server) handleCookExport(w http.ResponseWriter, r *http.Request) {
@@ -313,7 +358,7 @@ func (s *Server) handleCookExport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cook := cooklang.Export(recipe)
-	filename := url.PathEscape(recipe.Name) + ".cook"
+	filename := strings.ReplaceAll(recipe.Name, " ", "-") + ".cook"
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
@@ -416,6 +461,29 @@ func after(s, sep string) string {
 func renderStep(text string, ingredients []models.Ingredient) template.HTML {
 	annotated := cooklang.AnnotateStepForDisplay(text, ingredients)
 	return cooklang.ParseAndRender(annotated)
+}
+
+func groupIngredients(ings []models.Ingredient) []ingredientGroup {
+	var groups []ingredientGroup
+	var current *ingredientGroup
+	for i, ing := range ings {
+		if current == nil || ing.Group != current.Name {
+			groups = append(groups, ingredientGroup{Name: ing.Group, StartIdx: i})
+			current = &groups[len(groups)-1]
+		}
+		current.Items = append(current.Items, ing)
+	}
+	return groups
+}
+
+type ingredientGroup struct {
+	Name     string
+	Items    []models.Ingredient
+	StartIdx int
+}
+
+func cookHighlight(raw string) template.HTML {
+	return cooklang.Highlight(raw)
 }
 
 func recipeToJSONLD(r *models.Recipe) map[string]interface{} {

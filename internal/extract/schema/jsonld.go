@@ -355,18 +355,34 @@ func extractIngredients(m map[string]interface{}) []models.Ingredient {
 	return ingredients
 }
 
-var ingredientRe = regexp.MustCompile(`^(\d+\s*\d*/\d*|\d+\.?\d*)\s+(cups?|tablespoons?|teaspoons?|tbsp|tsp|c|oz|lbs?|pounds?|grams?|g|kg|ml|liters?|l|pinch|dash|cloves?|slices?|pieces?|heads?|sprigs?|bunches?|cans?|bottles?|packages?|sticks?|quarts?|pints?|gallons?)\s+(.+)$`)
+var unitList = `cups?|tablespoons?|teaspoons?|tbsp|tsp|c|oz|lbs?|pounds?|grams?|g|kg|ml|liters?|l|pinch(?:es)?|dash(?:es)?|cloves?|slices?|pieces?|heads?|sprigs?|bunch(?:es)?|cans?|bottles?|packages?|sticks?|quarts?|pints?|gallons?`
 
-var ingredientFracRe = regexp.MustCompile(`^(\d+\s+\d/\d+)\s+(cups?|tablespoons?|teaspoons?|tbsp|tsp|c|oz|lbs?|pounds?|grams?|g|kg|ml|liters?|l|pinch|dash|cloves?|slices?|pieces?|heads?|sprigs?|bunches?|cans?|bottles?|packages?|sticks?|quarts?|pints?|gallons?)\s+(.+)$`)
+var numPat = `(\d+\s+\d/\d+|\d+/\d+|\d+\.?\d*)`
+
+var ingredientRangeRe = regexp.MustCompile(`^(\d+[/\d]*\s*[-–]\s*\d+[/\.\d]*)\s+(` + unitList + `)\s+(.+)$`)
+var ingredientFracRe = regexp.MustCompile(`^` + numPat + `\s+(` + unitList + `)\s+(.+)$`)
+var ingredientFracAdjUnitRe = regexp.MustCompile(`^` + numPat + `\s+((?:\w+\s+){1,2})(` + unitList + `)\s+(.+)$`)
+var ingredientNoUnitRe = regexp.MustCompile(`^` + numPat + `\s+(.+)$`)
+
+func ParseIngredient(text string) models.Ingredient {
+	return parseIngredient(text)
+}
 
 func parseIngredient(text string) models.Ingredient {
 	text = strings.TrimSpace(text)
 
+	if m := ingredientRangeRe.FindStringSubmatch(text); len(m) == 4 {
+		return models.Ingredient{RawText: text, Quantity: m[1], Unit: m[2], Name: m[3]}
+	}
+	if m := ingredientFracAdjUnitRe.FindStringSubmatch(text); len(m) == 5 {
+		name := strings.TrimSpace(m[2]) + " " + m[4]
+		return models.Ingredient{RawText: text, Quantity: m[1], Unit: m[3], Name: name}
+	}
 	if m := ingredientFracRe.FindStringSubmatch(text); len(m) == 4 {
 		return models.Ingredient{RawText: text, Quantity: m[1], Unit: m[2], Name: m[3]}
 	}
-	if m := ingredientRe.FindStringSubmatch(text); len(m) == 4 {
-		return models.Ingredient{RawText: text, Quantity: m[1], Unit: m[2], Name: m[3]}
+	if m := ingredientNoUnitRe.FindStringSubmatch(text); len(m) == 3 {
+		return models.Ingredient{RawText: text, Quantity: m[1], Name: m[2]}
 	}
 	return models.Ingredient{RawText: text}
 }

@@ -3,6 +3,7 @@ package hrecipe
 import (
 	"strings"
 
+	"tangled.org/dunkirk.sh/pare/internal/extract/schema"
 	"tangled.org/dunkirk.sh/pare/internal/models"
 
 	"golang.org/x/net/html"
@@ -42,7 +43,7 @@ func Extract(body string) (*models.Recipe, bool) {
 
 	ingredients := findAllTextByClass(recipeNode, "p-ingredient")
 	for _, ing := range ingredients {
-		recipe.Ingredients = append(recipe.Ingredients, models.Ingredient{RawText: ing})
+		recipe.Ingredients = append(recipe.Ingredients, schema.ParseIngredient(ing))
 	}
 
 	instructions := findInnerHTMLByClass(recipeNode, "e-instructions")

@@ -1,0 +1,52 @@
+{{define "cook_page"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{.Recipe.Name}} — cook file</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/" class="wordmark">pare</a>
+  </nav>
+  <div class="page">
+    <div class="cook-header">
+      <a href="/{{trimProto .TargetURL}}" class="cook-back">&larr; Back to recipe</a>
+      <h2><a href="/export.cook?url={{.TargetURL | urlquery}}" download="{{.Filename}}" class="cook-filename"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> {{.Filename}}</a></h2>
+    </div>
+
+    <div class="cook-viewer">
+      <button class="cook-copy-btn" id="copy-btn" onclick="copyCook()" title="Copy to clipboard">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+      <pre class="cook-code">{{cookHighlight .CookFile}}</pre>
+    </div>
+
+    <div class="actions">
+      <a class="btn-primary no-ext" href="/export.cook?url={{.TargetURL | urlquery}}" download="{{.Filename}}">Download .cook</a>
+    </div>
+  </div>
+  <footer>
+    <span>made by <a href="https://dunkirk.sh" target="_blank" rel="noopener">Kieran Klukas</a></span>
+    <a href="https://tangled.org/dunkirk.sh/pare/commit/{{.GitHash}}" target="_blank" rel="noopener" class="commit-link">{{.GitHash}}</a>
+  </footer>
+<script>
+function copyCook() {
+  const text = {{.CookFile | json}};
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    btn.classList.add('cook-copy-done');
+    setTimeout(() => {
+      btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+      btn.classList.remove('cook-copy-done');
+    }, 1500);
+  });
+}
+</script>
+</body>
+</html>
+{{end}}

@@ -23,6 +23,7 @@ type Ingredient struct {
 	Quantity string
 	Unit     string
 	Name     string
+	Group    string
 }
 
 type Instruction struct {

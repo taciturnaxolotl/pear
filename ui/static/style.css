@@ -198,6 +198,15 @@ footer a:hover{color:var(--accent)}
   flex-shrink:0;
 }
 .ingredient-list li label{cursor:pointer;flex:1}
+.ingredient-group{
+  font-size:0.8rem;
+  text-transform:uppercase;
+  letter-spacing:0.06em;
+  color:var(--text-muted);
+  margin:1rem 0 0.25rem;
+  font-family:'Poppins',system-ui,sans-serif;
+  font-weight:600;
+}
 
 .instruction-list{counter-reset:step;list-style:none}
 .instruction-list li{
@@ -282,6 +291,20 @@ footer a:hover{color:var(--accent)}
 .tmr{font-weight:500;cursor:pointer;transition:color 0.2s;white-space:nowrap}
 .tmr:hover{color:var(--accent)}
 .tmr::before{content:"⏲";font-size:0.8em;margin-right:0.4em}
+
+.cook-link{
+  font-family:'SF Mono','Fira Code','Cascadia Code',monospace;
+  font-size:0.7rem;
+  color:var(--text-muted);
+  background:var(--check-bg);
+  padding:0.15rem 0.4rem;
+  border-radius:4px;
+  text-decoration:none;
+  vertical-align:middle;
+  margin-left:0.4rem;
+  transition:all 0.15s;
+}
+.cook-link:hover{color:var(--accent);background:var(--border);text-decoration:none}
 
 .actions{
   display:flex;
@@ -411,3 +434,53 @@ footer a:hover{color:var(--accent)}
   .actions{flex-direction:column}
   .actions a,.actions button{width:100%;justify-content:center}
 }
+
+.cook-header{margin-bottom:1rem}
+.cook-back{color:var(--text-muted);font-size:0.85rem;font-family:'Poppins',system-ui,sans-serif}
+.cook-back:hover{color:var(--accent)}
+.cook-header h2{font-family:'Poppins',system-ui,sans-serif;font-size:0.95rem;font-weight:500;color:var(--text-muted);margin-top:0.25rem}
+.cook-filename{color:var(--text-muted);text-decoration:none;font-weight:500;display:inline-flex;align-items:center;gap:0.3rem}
+.cook-filename:hover{color:var(--accent);text-decoration:underline}
+.cook-filename svg{flex-shrink:0}
+.cook-copy-btn{
+  position:absolute;
+  top:0.5rem;
+  right:0.5rem;
+  padding:0.4rem;
+  border:1px solid #3c3c3c;
+  border-radius:6px;
+  background:#2d2d2d;
+  color:#999;
+  cursor:pointer;
+  transition:all 0.15s;
+  opacity:0;
+}
+.cook-viewer:hover .cook-copy-btn{opacity:1}
+.cook-copy-btn:hover{border-color:var(--accent);color:var(--accent)}
+.cook-copy-done{border-color:#22c55e!important;color:#22c55e!important;opacity:1!important}
+
+.cook-viewer{
+  position:relative;
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  background:#1e1e1e;
+  overflow-x:auto;
+}
+.cook-code{
+  padding:1.25rem;
+  margin:0;
+  font-family:'SF Mono','Fira Code','Cascadia Code',monospace;
+  font-size:0.85rem;
+  line-height:1.65;
+  color:#d4d4d4;
+  white-space:pre;
+  overflow-x:auto;
+}
+.cook-code .ck-delim{color:#6a9955;font-weight:600}
+.cook-code .ck-key{color:#9cdcfe}
+.cook-code .ck-val{color:#ce9178}
+.cook-code .ck-section{color:#569cd6;font-weight:600}
+.cook-code .ck-ing{color:#4ec9b0}
+.cook-code .ck-tmr{color:#dcdcaa}
+.cook-code .ck-qty{color:#b5cea8}
+.cook-code .ck-unit{color:#ce9178}

@@ -50,14 +50,39 @@ func Export(recipe *models.Recipe) string {
 	}
 
 	if len(unmatched) > 0 {
-		sb.WriteString("\n\n== Ingredients ==\n")
-		for _, ing := range unmatched {
-			ref := ingredientCookRef(ing)
-			sb.WriteString(fmt.Sprintf("- %s\n", ref))
+		groups := groupIngredients(unmatched)
+		for _, g := range groups {
+			sb.WriteString("\n\n== ")
+			if g.Name != "" {
+				sb.WriteString(g.Name + " ")
+			}
+			sb.WriteString("Ingredients ==\n")
+			for _, ing := range g.Items {
+				ref := ingredientCookRef(ing)
+				sb.WriteString(fmt.Sprintf("- %s\n", ref))
+			}
 		}
 	}
 
 	return sb.String()
+}
+
+type ingredientGroup struct {
+	Name  string
+	Items []models.Ingredient
+}
+
+func groupIngredients(ings []models.Ingredient) []ingredientGroup {
+	var groups []ingredientGroup
+	var current *ingredientGroup
+	for _, ing := range ings {
+		if current == nil || ing.Group != current.Name {
+			groups = append(groups, ingredientGroup{Name: ing.Group})
+			current = &groups[len(groups)-1]
+		}
+		current.Items = append(current.Items, ing)
+	}
+	return groups
 }
 
 var timeRangeExportRe = regexp.MustCompile(`(?i)\b(\d+-\d+)\s*(seconds?|minutes?|mins?|hours?|hrs?|h)\b`)
@@ -250,13 +275,13 @@ func buildIngredientIndex(ingredients []models.Ingredient) map[string]models.Ing
 	return index
 }
 
-var ingredientPrefixRe = regexp.MustCompile(`^(?i)(\d+\s*\S*\s+)?(?:of\s+)?(.+)$`)
+var ingredientPrefixRe = regexp.MustCompile(`^(?i)(\d+\s*\d*/?\d*\s+)?(?:of\s+)?(.+)$`)
 
 func extractIngredientName(raw string) string {
 	raw = strings.TrimSpace(raw)
-	parts := ingredientPrefixRe.FindStringSubmatch(raw)
-	if len(parts) >= 3 && parts[2] != "" {
-		name := parts[2]
+	m := ingredientPrefixRe.FindStringSubmatch(raw)
+	if len(m) >= 3 && m[2] != "" {
+		name := m[2]
 		name = strings.TrimPrefix(name, "of ")
 		name = strings.TrimSpace(name)
 		name = strings.TrimSuffix(name, ",")

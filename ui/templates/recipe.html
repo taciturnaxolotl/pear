@@ -35,6 +35,7 @@
     {{if .Recipe.PrepTime}}<span>⏱ {{fmtDuration .Recipe.PrepTime}} prep</span>{{end}}
     {{if .Recipe.CookTime}}<span>⏱ {{fmtDuration .Recipe.CookTime}} cook</span>{{end}}
     {{if .Recipe.Yield}}<span>Serves {{.Recipe.Yield}}</span>{{end}}
+    <a href="/export.cook?url={{.TargetURL | urlquery}}" class="cook-link" download>.cook</a>
   </div>
   {{if .Recipe.Description}}<p class="description">{{.Recipe.Description}}</p>{{end}}
 </div>
@@ -42,14 +43,17 @@
 {{if .Recipe.Ingredients}}
 <div class="section">
   <h3>Ingredients</h3>
+  {{range $g := groupIngredients $.Recipe.Ingredients}}
+  {{if $g.Name}}<h4 class="ingredient-group">{{$g.Name}}</h4>{{end}}
   <ul class="ingredient-list">
-    {{range $i, $ing := .Recipe.Ingredients}}
-    <li id="ing-{{$i}}" onclick="toggleCheck(this)">
-      <input type="checkbox" id="cb-{{$i}}">
-      <label for="cb-{{$i}}">{{$ing.RawText}}</label>
+    {{range $j, $ing := $g.Items}}
+    <li onclick="toggleCheck(this)">
+      <input type="checkbox">
+      <label>{{$ing.RawText}}</label>
     </li>
     {{end}}
   </ul>
+  {{end}}
 </div>
 {{end}}
 
@@ -75,7 +79,6 @@
 {{end}}
 
 <div class="actions">
-  <a class="btn-primary no-ext" href="/export.cook?url={{.TargetURL | urlquery}}">Download .cook</a>
 </div>
 
 <script>
@@ -89,7 +92,8 @@ function toggleCheck(li) {
 function saveChecks() {
   const state = {};
   document.querySelectorAll('.ingredient-list li').forEach(li => {
-    state[li.id] = li.classList.contains('checked');
+    const label = li.querySelector('label').textContent;
+    if (li.classList.contains('checked')) state[label] = true;
   });
   localStorage.setItem('pare:' + location.pathname.slice(1), JSON.stringify({t: Date.now(), s: state}));
 }
@@ -102,9 +106,9 @@ function loadChecks() {
       localStorage.removeItem('pare:' + location.pathname.slice(1));
       return;
     }
-    Object.entries(raw.s).forEach(([id, checked]) => {
-      const li = document.getElementById(id);
-      if (li && checked) {
+    document.querySelectorAll('.ingredient-list li').forEach(li => {
+      const label = li.querySelector('label').textContent;
+      if (raw.s[label]) {
         li.classList.add('checked');
         li.querySelector('input[type="checkbox"]').checked = true;
       }

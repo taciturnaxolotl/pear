@@ -12,6 +12,7 @@ import (
 
 	"tangled.org/dunkirk.sh/pare/internal/extract/hrecipe"
 	"tangled.org/dunkirk.sh/pare/internal/extract/schema"
+	"tangled.org/dunkirk.sh/pare/internal/extract/wprm"
 	"tangled.org/dunkirk.sh/pare/internal/models"
 )
 
@@ -55,6 +56,12 @@ func (p *Pipeline) Extract(targetURL string) *Result {
 		} else {
 			return &Result{Error: fmt.Errorf("fetching page: %w", err)}
 		}
+	}
+
+	if recipe, ok := wprm.Extract(body); ok {
+		recipe.SourceURL = targetURL
+		recipe.SourceDomain = domainOf(targetURL)
+		return &Result{Recipe: recipe}
 	}
 
 	if recipe, ok := schema.Extract(body); ok {

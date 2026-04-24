@@ -88,6 +88,8 @@ func main() {
 	r.Get("/recipe", srv.handleRecipeQuery)
 	r.Get("/userscript", srv.handleUserscript)
 	r.Get("/status", srv.handleStatus)
+	r.Get("/flagged", srv.handleFlagged)
+	r.Get("/flag", srv.handleFlag)
 	r.Get("/*", srv.handleRecipePath)
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticContent))))
 
@@ -187,6 +189,22 @@ func (s *Server) handleRecipePath(w http.ResponseWriter, r *http.Request) {
 	}
 
 	targetURL := "https://" + path[1:]
+
+	// Handle ?unflag query param
+	if r.URL.Query().Has("unflag") {
+		s.cache.Unflag(targetURL)
+		http.Redirect(w, r, path, http.StatusSeeOther)
+		return
+	}
+
+	// Handle ?refresh query param — clear cache and re-extract
+	if r.URL.Query().Has("refresh") {
+		s.cache.Invalidate(targetURL)
+		s.failedMu.Lock()
+		delete(s.failed, targetURL)
+		s.failedMu.Unlock()
+		// fall through to normal flow (no cache hit → re-extract)
+	}
 
 	recipe, err := s.cache.Get(targetURL)
 	if err != nil {
@@ -332,6 +350,7 @@ func (s *Server) renderRecipe(w http.ResponseWriter, recipe *models.Recipe, targ
 		"Filename":  filename,
 		"GitHash":    s.gitHash,
 		"BaseURL":    s.baseURL,
+		"IsFlagged":  s.cache.IsFlagged(targetURL),
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	s.templates.ExecuteTemplate(w, "recipe_page", data)
@@ -404,6 +423,69 @@ func (s *Server) handleCookExport(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
 	w.Write([]byte(cook))
+}
+
+func (s *Server) handleFlag(w http.ResponseWriter, r *http.Request) {
+	targetURL := r.URL.Query().Get("url")
+	if targetURL == "" {
+		targetURL = r.FormValue("url")
+	}
+	if targetURL == "" {
+		http.Error(w, "missing url", http.StatusBadRequest)
+		return
+	}
+
+	recipe, err := s.cache.Get(targetURL)
+	if err != nil {
+		log.Printf("cache read error: %v", err)
+	}
+	if recipe == nil {
+		http.Error(w, "recipe not found", http.StatusNotFound)
+		return
+	}
+
+	if err := s.cache.Flag(targetURL, recipe); err != nil {
+		log.Printf("flag error: %v", err)
+		http.Error(w, "flag failed", http.StatusInternalServerError)
+		return
+	}
+
+	data := map[string]interface{}{
+		"SourceURL": targetURL,
+		"GitHash":   s.gitHash,
+		"BaseURL":   s.baseURL,
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	s.templates.ExecuteTemplate(w, "flag_page", data)
+}
+
+func (s *Server) handleFlagged(w http.ResponseWriter, r *http.Request) {
+	flagged, err := s.cache.ListFlagged()
+	if err != nil {
+		log.Printf("list flagged error: %v", err)
+	}
+
+	var recipes []indexRecentRecipe
+	for _, cr := range flagged {
+		var recipe models.Recipe
+		if err := json.Unmarshal(cr.Recipe, &recipe); err != nil {
+			continue
+		}
+		recipes = append(recipes, indexRecentRecipe{
+			Name:      recipe.Name,
+			ImageURL:  recipe.ImageURL,
+			SourceURL: cr.URL,
+			Domain:    recipe.SourceDomain,
+		})
+	}
+
+	data := map[string]interface{}{
+		"GitHash":  s.gitHash,
+		"BaseURL":  s.baseURL,
+		"Flagged":  recipes,
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	s.templates.ExecuteTemplate(w, "flagged_page", data)
 }
 
 func (s *Server) renderError(w http.ResponseWriter, errMsg, sourceURL string) {

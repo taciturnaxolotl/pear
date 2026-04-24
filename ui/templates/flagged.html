@@ -1,0 +1,41 @@
+{{define "flagged_page"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Flagged Recipes</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/" class="wordmark">pear</a>
+  </nav>
+  <div class="page">
+    <div class="flagged-header">
+      <h2>Flagged Recipes</h2>
+    </div>
+{{if .Flagged}}
+    <div class="recent-grid">
+      {{range .Flagged}}
+      <a href="/{{trimProto .SourceURL}}" class="recent-card">
+        {{if .ImageURL}}<img src="{{.ImageURL}}" alt="{{.Name}}" referrerpolicy="no-referrer">{{end}}
+        <div class="recent-card-body">
+          <div class="recent-card-name">{{.Name}}</div>
+          <div class="recent-card-domain">{{.Domain}}</div>
+        </div>
+      </a>
+      {{end}}
+    </div>
+{{else}}
+    <p class="flagged-empty">No flagged recipes yet.</p>
+{{end}}
+  </div>
+  <footer>
+    <span>made by <a href="https://dunkirk.sh" target="_blank" rel="noopener">Kieran Klukas</a></span>
+    <a href="https://tangled.org/dunkirk.sh/pear/commit/{{.GitHash}}" target="_blank" rel="noopener" class="commit-link">{{.GitHash}}</a>
+  </footer>
+</body>
+</html>
+{{end}}

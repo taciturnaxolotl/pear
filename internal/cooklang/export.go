@@ -88,6 +88,41 @@ func groupIngredients(ings []models.Ingredient) []ingredientGroup {
 var timeRangeExportRe = regexp.MustCompile(`(?i)\b(\d+-\d+)\s*(seconds?|minutes?|mins?|hours?|hrs?|h)\b`)
 var timeRe = regexp.MustCompile(`(?i)(^|[^0-9-])(\d+)\s*(seconds?|minutes?|mins?|hours?|hrs?|h)\b`)
 
+var frTimeRangeExportRe = regexp.MustCompile(`(?i)\b(\d+-\d+)\s*(secondes?|minutes?|mins?|heures?|h)\b`)
+var frTimeRe = regexp.MustCompile(`(?i)(^|[^0-9-])(\d+)\s*(secondes?|minutes?|mins?|heures?|h)\b`)
+
+func AnnotateTimersOnly(text string, lang string) string {
+	rangeRe, timeReLang := timeRangeExportRe, timeRe
+	if strings.HasPrefix(lang, "fr") {
+		rangeRe, timeReLang = frTimeRangeExportRe, frTimeRe
+	}
+
+	annotated := rangeRe.ReplaceAllStringFunc(text, func(matchStr string) string {
+		parts := rangeRe.FindStringSubmatch(matchStr)
+		if len(parts) >= 3 {
+			qty := parts[1]
+			unit := parts[2]
+			unit = normalizeTimeUnit(unit)
+			return fmt.Sprintf("~{%s%%%s}", qty, unit)
+		}
+		return matchStr
+	})
+
+	annotated = timeReLang.ReplaceAllStringFunc(annotated, func(matchStr string) string {
+		parts := timeReLang.FindStringSubmatch(matchStr)
+		if len(parts) >= 4 {
+			leading := parts[1]
+			qty := parts[2]
+			unit := parts[3]
+			unit = normalizeTimeUnit(unit)
+			return leading + fmt.Sprintf("~{%s%%%s}", qty, unit)
+		}
+		return matchStr
+	})
+
+	return annotated
+}
+
 func AnnotateStepForDisplay(text string, ingredients []models.Ingredient) string {
 	index := buildIngredientIndex(ingredients)
 	annotated, _ := annotateStep(text, index)
@@ -177,6 +212,10 @@ func normalizeTimeUnit(unit string) string {
 	case "min", "mins":
 		return "minute"
 	case "hr", "hrs", "h":
+		return "hour"
+	case "seconde", "secondes":
+		return "second"
+	case "heure", "heures":
 		return "hour"
 	default:
 		return unit

@@ -1,6 +1,6 @@
 {{define "recipe_page"}}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{if .Recipe.Language}}{{.Recipe.Language}}{{else}}en{{end}}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -76,7 +76,7 @@
   <h3>Instructions</h3>
   <ol class="instruction-list">
     {{range .Recipe.Instructions}}
-    <li>{{renderStep .Text $.Recipe.Ingredients}}</li>
+    <li>{{renderStep .Text $.Recipe.Ingredients $.Recipe.Language}}</li>
     {{end}}
   </ol>
 </div>

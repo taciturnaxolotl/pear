@@ -7,14 +7,18 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
 	"tangled.org/dunkirk.sh/pear/internal/extract/hrecipe"
+	"tangled.org/dunkirk.sh/pear/internal/extract/marmiton"
 	"tangled.org/dunkirk.sh/pear/internal/extract/schema"
 	"tangled.org/dunkirk.sh/pear/internal/extract/wprm"
 	"tangled.org/dunkirk.sh/pear/internal/models"
 )
+
+var htmlLangRe = regexp.MustCompile(`(?i)<html[^>]*\blang=["']([a-zA-Z-]+)`)
 
 type Pipeline struct {
 	client         *http.Client
@@ -58,27 +62,40 @@ func (p *Pipeline) Extract(targetURL string) *Result {
 		}
 	}
 
+	lang := detectLanguage(body)
+
+	if recipe, ok := marmiton.Extract(body); ok {
+		recipe.SourceURL = targetURL
+		recipe.SourceDomain = domainOf(targetURL)
+		recipe.Language = lang
+		return &Result{Recipe: recipe}
+	}
+
 	if recipe, ok := wprm.Extract(body); ok {
 		recipe.SourceURL = targetURL
 		recipe.SourceDomain = domainOf(targetURL)
+		recipe.Language = lang
 		return &Result{Recipe: recipe}
 	}
 
 	if recipe, ok := schema.Extract(body); ok {
 		recipe.SourceURL = targetURL
 		recipe.SourceDomain = domainOf(targetURL)
+		recipe.Language = lang
 		return &Result{Recipe: recipe}
 	}
 
 	if recipe, ok := schema.ExtractMicrodata(body); ok {
 		recipe.SourceURL = targetURL
 		recipe.SourceDomain = domainOf(targetURL)
+		recipe.Language = lang
 		return &Result{Recipe: recipe}
 	}
 
 	if recipe, ok := hrecipe.Extract(body); ok {
 		recipe.SourceURL = targetURL
 		recipe.SourceDomain = domainOf(targetURL)
+		recipe.Language = lang
 		return &Result{Recipe: recipe}
 	}
 
@@ -154,6 +171,13 @@ func (p *Pipeline) fetchViaFlareSolver(targetURL string) (string, error) {
 	}
 
 	return result.Solution.Response, nil
+}
+
+func detectLanguage(body string) string {
+	if m := htmlLangRe.FindStringSubmatch(body); len(m) >= 2 {
+		return strings.ToLower(m[1])
+	}
+	return ""
 }
 
 func domainOf(url string) string {

@@ -356,7 +356,7 @@ func extractIngredients(m map[string]interface{}) []models.Ingredient {
 	return ingredients
 }
 
-var unitList = `cups?|tablespoons?|teaspoons?|tbsp|tsp|c|oz|lbs?|pounds?|grams?|g|kg|ml|liters?|l|pinch(?:es)?|dash(?:es)?|cloves?|slices?|pieces?|heads?|sprigs?|bunch(?:es)?|cans?|bottles?|packages?|sticks?|quarts?|pints?|gallons?`
+var unitList = `cups?|tablespoons?|teaspoons?|tbsp|tsp|c|oz|lbs?|pounds?|grams?|g|kg|ml|liters?|l|pinch(?:es)?|dash(?:es)?|cloves?|slices?|pieces?|heads?|sprigs?|bunch(?:es)?|cans?|bottles?|packages?|sticks?|quarts?|pints?|gallons?|cuill[eè]res?\s*[aà]\s+(?:soupe|café)|cl|dl|mg|cuill[eè]re\s+(?:de\s+)?(?:soupe|café)|verres?|pinc[eé]es?|sachets?|bo[iî]tes?|tranches?|morceaux?|tiges?|gousses?|botte(?:s)?|paquets?|brisures?|feuilles?`
 
 var numPat = `(\d+\s+\d/\d+|\d+/\d+|\d+\.?\d*)`
 

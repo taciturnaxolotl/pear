@@ -499,9 +499,12 @@ func after(s, sep string) string {
 	return s[i+len(sep):]
 }
 
-func renderStep(text string, ingredients []models.Ingredient) template.HTML {
-	annotated := cooklang.AnnotateStepForDisplay(text, ingredients)
-	return cooklang.ParseAndRender(annotated)
+func renderStep(text string, ingredients []models.Ingredient, lang string) template.HTML {
+	if lang == "" || lang == "en" || strings.HasPrefix(lang, "en-") {
+		annotated := cooklang.AnnotateStepForDisplay(text, ingredients)
+		return cooklang.ParseAndRender(annotated)
+	}
+	return cooklang.ParseAndRender(cooklang.AnnotateTimersOnly(text, lang))
 }
 
 func groupIngredients(ings []models.Ingredient) []ingredientGroup {

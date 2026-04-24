@@ -15,6 +15,7 @@ type Recipe struct {
 	Servings     int
 	Ingredients  []Ingredient
 	Instructions []Instruction
+	Language         string
 	ExtractionMethod string
 }
 

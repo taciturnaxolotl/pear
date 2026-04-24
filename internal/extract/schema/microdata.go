@@ -99,9 +99,8 @@ func getMicrodataProp(n *html.Node, prop string) string {
 		if node.Type == html.ElementNode {
 			for _, attr := range node.Attr {
 				if attr.Key == "itemprop" && attr.Val == prop {
-					// For img elements, use src/content
 					if node.Data == "img" {
-						result = getAttrVal(node, "src")
+						result = getImgSrc(node)
 						if result == "" {
 							result = getAttrVal(node, "content")
 						}
@@ -136,7 +135,7 @@ func getMicrodataImageProp(n *html.Node) string {
 			for _, attr := range node.Attr {
 				if attr.Key == "itemprop" && (attr.Val == "image") {
 					if node.Data == "img" {
-						if src := getAttrVal(node, "src"); src != "" {
+						if src := getImgSrc(node); src != "" {
 							return src
 						}
 					}
@@ -168,7 +167,7 @@ func getAllMicrodataProps(n *html.Node, prop string) []string {
 				if attr.Key == "itemprop" && attr.Val == prop {
 					text := ""
 					if node.Data == "img" {
-						text = getAttrVal(node, "src")
+						text = getImgSrc(node)
 					} else if node.Data == "meta" {
 						text = getAttrVal(node, "content")
 					} else {
@@ -188,6 +187,20 @@ func getAllMicrodataProps(n *html.Node, prop string) []string {
 	}
 	f(n)
 	return results
+}
+
+func getImgSrc(n *html.Node) string {
+	if src := getAttrVal(n, "data-lazy-src"); src != "" && !strings.HasPrefix(src, "data:") {
+		return src
+	}
+	if src := getAttrVal(n, "data-src"); src != "" && !strings.HasPrefix(src, "data:") {
+		return src
+	}
+	src := getAttrVal(n, "src")
+	if src != "" && !strings.HasPrefix(src, "data:") {
+		return src
+	}
+	return ""
 }
 
 func getAttrVal(n *html.Node, key string) string {

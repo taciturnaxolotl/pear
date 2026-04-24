@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"os"
 	"strings"
 	"time"
 
@@ -33,6 +34,9 @@ func main() {
 	baseURL := flag.String("base-url", "", "base URL of this service")
 	flag.Parse()
 
+	if *baseURL == "" {
+		*baseURL = os.Getenv("BASE_URL")
+	}
 	if *baseURL == "" {
 		*baseURL = fmt.Sprintf("http://localhost:%d", *port)
 	}

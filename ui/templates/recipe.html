@@ -7,6 +7,15 @@
   <title>{{.Recipe.Name}}</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="stylesheet" href="/static/style.css">
+  <meta property="og:title" content="{{.Recipe.Name}}">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="{{.BaseURL}}/recipe?url={{.TargetURL | urlquery}}">
+  {{if .Recipe.Description}}<meta property="og:description" content="{{.Recipe.Description}}">{{end}}
+  {{if .Recipe.ImageURL}}<meta property="og:image" content="{{.Recipe.ImageURL}}">{{else}}<meta property="og:image" content="{{.BaseURL}}/static/og.png">{{end}}
+  <meta name="twitter:card" content="{{if .Recipe.ImageURL}}summary_large_image{{else}}summary{{end}}">
+  <meta name="twitter:title" content="{{.Recipe.Name}}">
+  {{if .Recipe.Description}}<meta name="twitter:description" content="{{.Recipe.Description}}">{{end}}
+  {{if .Recipe.ImageURL}}<meta name="twitter:image" content="{{.Recipe.ImageURL}}">{{else}}<meta name="twitter:image" content="{{.BaseURL}}/static/og.png">{{end}}
 </head>
 <body>
   <nav>

@@ -93,7 +93,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/recipe?url="+url.QueryEscape(targetURL), http.StatusFound)
 		return
 	}
-	s.templates.ExecuteTemplate(w, "index_page", map[string]string{"GitHash": s.gitHash})
+	s.templates.ExecuteTemplate(w, "index_page", map[string]string{"GitHash": s.gitHash, "BaseURL": s.baseURL})
 }
 
 func (s *Server) handleRecipe(w http.ResponseWriter, r *http.Request) {
@@ -127,6 +127,7 @@ func (s *Server) handleRecipe(w http.ResponseWriter, r *http.Request) {
 		"Recipe":     recipe,
 		"TargetURL": targetURL,
 		"GitHash":    s.gitHash,
+		"BaseURL":    s.baseURL,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

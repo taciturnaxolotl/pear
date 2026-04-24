@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"tangled.org/dunkirk.sh/pare/internal/models"
+	"tangled.org/dunkirk.sh/pear/internal/models"
 
 	"golang.org/x/net/html"
 )

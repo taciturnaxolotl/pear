@@ -1,4 +1,4 @@
-module tangled.org/dunkirk.sh/pare
+module tangled.org/dunkirk.sh/pear
 
 go 1.26.2
 

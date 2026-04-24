@@ -19,11 +19,11 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
 
-	"tangled.org/dunkirk.sh/pare/internal/cache"
-	"tangled.org/dunkirk.sh/pare/internal/cooklang"
-	"tangled.org/dunkirk.sh/pare/internal/extract"
-	"tangled.org/dunkirk.sh/pare/internal/models"
-	"tangled.org/dunkirk.sh/pare/ui"
+	"tangled.org/dunkirk.sh/pear/internal/cache"
+	"tangled.org/dunkirk.sh/pear/internal/cooklang"
+	"tangled.org/dunkirk.sh/pear/internal/extract"
+	"tangled.org/dunkirk.sh/pear/internal/models"
+	"tangled.org/dunkirk.sh/pear/ui"
 )
 
 var gitHash = "dev"
@@ -31,7 +31,7 @@ var gitHash = "dev"
 func main() {
 	godotenv.Load()
 	port := flag.Int("port", 3000, "port to listen on")
-	dbPath := flag.String("db", "pare.db", "path to SQLite database")
+	dbPath := flag.String("db", "pear.db", "path to SQLite database")
 	baseURL := flag.String("base-url", "", "base URL of this service")
 	flag.Parse()
 

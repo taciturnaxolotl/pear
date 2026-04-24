@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"tangled.org/dunkirk.sh/pare/internal/models"
+	"tangled.org/dunkirk.sh/pear/internal/models"
 
 	_ "github.com/mattn/go-sqlite3"
 )

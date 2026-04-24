@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"tangled.org/dunkirk.sh/pare/internal/models"
+	"tangled.org/dunkirk.sh/pear/internal/models"
 )
 
 func Export(recipe *models.Recipe) string {

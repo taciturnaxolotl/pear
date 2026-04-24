@@ -3,7 +3,7 @@ tmp/
 *.exe
 *.test
 *.out
-pare
+pear
 .DS_Store
 build-errors.log
-pare.db*
+pear.db*

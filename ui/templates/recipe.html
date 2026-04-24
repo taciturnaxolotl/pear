@@ -19,7 +19,7 @@
 </head>
 <body>
   <nav>
-    <a href="/" class="wordmark">pare</a>
+    <a href="/" class="wordmark">pear</a>
   </nav>
   <div class="page">
 {{if .Recipe.ImageURL}}
@@ -95,15 +95,15 @@ function saveChecks() {
     const label = li.querySelector('label').textContent;
     if (li.classList.contains('checked')) state[label] = true;
   });
-  localStorage.setItem('pare:' + location.pathname.slice(1), JSON.stringify({t: Date.now(), s: state}));
+  localStorage.setItem('pear:' + location.pathname.slice(1), JSON.stringify({t: Date.now(), s: state}));
 }
 
 function loadChecks() {
   try {
-    const raw = JSON.parse(localStorage.getItem('pare:' + location.pathname.slice(1)) || 'null');
+    const raw = JSON.parse(localStorage.getItem('pear:' + location.pathname.slice(1)) || 'null');
     if (!raw) return;
     if (Date.now() - raw.t > 48 * 60 * 60 * 1000) {
-      localStorage.removeItem('pare:' + location.pathname.slice(1));
+      localStorage.removeItem('pear:' + location.pathname.slice(1));
       return;
     }
     document.querySelectorAll('.ingredient-list li').forEach(li => {
@@ -233,7 +233,7 @@ if ('Notification' in window && Notification.permission === 'default') {
   </div>
   <footer>
     <span>made by <a href="https://dunkirk.sh" target="_blank" rel="noopener">Kieran Klukas</a></span>
-    <a href="https://tangled.org/dunkirk.sh/pare/commit/{{.GitHash}}" target="_blank" rel="noopener" class="commit-link">{{.GitHash}}</a>
+    <a href="https://tangled.org/dunkirk.sh/pear/commit/{{.GitHash}}" target="_blank" rel="noopener" class="commit-link">{{.GitHash}}</a>
   </footer>
 </body>
 </html>

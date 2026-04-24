@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"tangled.org/dunkirk.sh/pare/internal/extract/hrecipe"
-	"tangled.org/dunkirk.sh/pare/internal/extract/schema"
-	"tangled.org/dunkirk.sh/pare/internal/extract/wprm"
-	"tangled.org/dunkirk.sh/pare/internal/models"
+	"tangled.org/dunkirk.sh/pear/internal/extract/hrecipe"
+	"tangled.org/dunkirk.sh/pear/internal/extract/schema"
+	"tangled.org/dunkirk.sh/pear/internal/extract/wprm"
+	"tangled.org/dunkirk.sh/pear/internal/models"
 )
 
 type Pipeline struct {

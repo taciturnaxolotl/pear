@@ -203,7 +203,9 @@ func (s *Server) handleRecipePath(w http.ResponseWriter, r *http.Request) {
 		s.failedMu.Lock()
 		delete(s.failed, targetURL)
 		s.failedMu.Unlock()
-		// fall through to normal flow (no cache hit → re-extract)
+		// Redirect to same path without query params to avoid loop
+		http.Redirect(w, r, path, http.StatusSeeOther)
+		return
 	}
 
 	recipe, err := s.cache.Get(targetURL)

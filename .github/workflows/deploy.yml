@@ -1,0 +1,66 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: pear → terebithia
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://pear.dunkirk.sh
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags "-X main.gitHash=$(git rev-parse --short HEAD)" -o pear .
+
+      - name: Setup Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          use-cache: "true"
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "StrictHostKeyChecking accept-new" >> ~/.ssh/config
+
+      - name: Deploy
+        run: |
+          scp pear pear@terebithia:~/app/pear-new
+          ssh pear@terebithia << 'DEPLOY'
+            set -e
+            cd ~/app
+            chmod +x pear-new
+            mv -f pear-new pear
+            sudo /run/current-system/sw/bin/systemctl restart pear.service
+          DEPLOY
+
+      - name: Health check
+        run: |
+          for i in $(seq 1 12); do
+            if curl -sf -o /dev/null "https://pear.dunkirk.sh"; then
+              echo "Healthy"
+              exit 0
+            fi
+            echo "Attempt $i/12 failed"
+            sleep 5
+          done
+          echo "Health check failed"
+          exit 1

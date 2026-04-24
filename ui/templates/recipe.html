@@ -162,6 +162,7 @@ function startTimer() {
   if (timerRunning) return;
   timerRunning = true;
   document.getElementById('timer-toggle').textContent = 'Pause';
+  document.getElementById('timer-widget').classList.add('timer-running');
   timerInterval = setInterval(() => {
     timerRemaining--;
     updateTimerDisplay();
@@ -175,6 +176,7 @@ function startTimer() {
       timerRunning = false;
       document.getElementById('timer-toggle').textContent = 'Start';
       document.getElementById('timer-display').classList.add('timer-done');
+      document.getElementById('timer-widget').classList.remove('timer-running');
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification('Timer done!', { body: document.getElementById('timer-label').textContent + ' is done!' });
       }
@@ -187,6 +189,7 @@ function pauseTimer() {
   clearInterval(timerInterval);
   timerInterval = null;
   document.getElementById('timer-toggle').textContent = 'Unpause';
+  document.getElementById('timer-widget').classList.remove('timer-running');
 }
 
 function resetTimer() {
@@ -204,6 +207,7 @@ function resetTimer() {
   }
   document.getElementById('timer-toggle').textContent = 'Start';
   document.getElementById('timer-display').classList.remove('timer-done');
+  document.getElementById('timer-widget').classList.remove('timer-running');
   updateTimerDisplay();
 }
 
@@ -215,6 +219,7 @@ function closeTimer() {
   if (timerSound) { timerSound.pause(); timerSound.currentTime = 0; }
   document.getElementById('timer-widget').classList.remove('timer-open');
   document.getElementById('timer-display').classList.remove('timer-done');
+  document.getElementById('timer-widget').classList.remove('timer-running');
   timerRemaining = 0;
   updateTimerDisplay();
 }

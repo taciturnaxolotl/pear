@@ -40,6 +40,7 @@ nav{
   margin:0 auto;
   padding:1.25rem 1.5rem;
   width:100%;
+  box-sizing:border-box;
 }
 nav a.wordmark{
   font-family:'Poppins',system-ui,sans-serif;
@@ -56,18 +57,21 @@ nav a.wordmark:hover{text-decoration:none}
   margin:0 auto;
   padding:0 1.5rem 2rem;
   flex:1;
+  width:100%;
 }
 
 footer{
   display:flex;
   justify-content:space-between;
   align-items:center;
-  padding:1.25rem 2rem;
+  padding:1.25rem 1.5rem;
   color:var(--text-muted);
   font-size:0.8rem;
   font-family:'Poppins',system-ui,sans-serif;
   border-top:1px solid var(--border);
   margin-top:auto;
+  width:100%;
+  box-sizing:border-box;
 }
 footer a{color:var(--text-muted)}
 footer a:hover{color:var(--accent)}
@@ -155,7 +159,7 @@ footer a:hover{color:var(--accent)}
 
 .recipe-header{margin-bottom:1.5rem}
 .recipe-header h2{font-size:2rem;line-height:1.3;letter-spacing:0;font-weight:600;margin-bottom:0.35rem}
-.recipe-meta{color:var(--text-muted);font-size:0.9rem}
+.recipe-meta{color:var(--text-muted);font-size:0.9rem;max-width:100%;overflow-wrap:break-word}
 .recipe-meta span{margin-right:1rem}
 .description{margin-top:0.5rem;color:var(--text-muted);font-size:0.95rem}
 
@@ -287,7 +291,11 @@ footer a:hover{color:var(--accent)}
   color:var(--text-muted);
   transition:background 0.15s,color 0.15s,border-color 0.15s;
 }
-.timer-btn:hover{border-color:var(--accent);background:var(--accent);color:#fff}
+.timer-running #timer-toggle{
+  border-color:var(--accent);
+  background:var(--accent);
+  color:#fff;
+}
 .timer-btn:active{transform:scale(0.96)}
 
 .tmr{font-weight:500;cursor:pointer;transition:color 0.2s;white-space:nowrap}
@@ -431,10 +439,18 @@ footer a:hover{color:var(--accent)}
   nav{padding:1rem}
   footer{padding:1rem}
   .hero h1{font-size:1.8rem}
-  .hero{padding:2.5rem 0 2rem}
+  .hero{padding:1.5rem 0 0.5rem}
   .search-form form{flex-direction:column}
+  .search-form button{width:100%}
+  .recipe-header h2{font-size:1.4rem}
+  .recipe-meta{font-size:0.8rem}
+  .recipe-meta span{margin-right:0.5rem}
+  .recipe-image{max-height:250px}
+  .recent-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
   .actions{flex-direction:column}
   .actions a,.actions button{width:100%;justify-content:center}
+  .timer-display{font-size:2.25rem}
+  .instruction-list li{padding-left:1.5rem}
 }
 
 .cook-header{margin-bottom:1rem}

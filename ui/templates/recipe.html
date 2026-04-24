@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/static/style.css">
   <meta property="og:title" content="{{.Recipe.Name}}">
   <meta property="og:type" content="article">
-  <meta property="og:url" content="{{.BaseURL}}/recipe?url={{.TargetURL | urlquery}}">
+  <meta property="og:url" content="{{.BaseURL}}/{{trimProto .TargetURL}}">
   {{if .Recipe.Description}}<meta property="og:description" content="{{.Recipe.Description}}">{{end}}
   {{if .Recipe.ImageURL}}<meta property="og:image" content="{{.Recipe.ImageURL}}">{{else}}<meta property="og:image" content="{{.BaseURL}}/static/og.png">{{end}}
   <meta name="twitter:card" content="{{if .Recipe.ImageURL}}summary_large_image{{else}}summary{{end}}">
@@ -75,7 +75,7 @@
 {{end}}
 
 <div class="actions">
-  <a class="btn-primary" href="/export.cook?url={{.TargetURL | urlquery}}">Download .cook</a>
+  <a class="btn-primary no-ext" href="/export.cook?url={{.TargetURL | urlquery}}">Download .cook</a>
 </div>
 
 <script>
@@ -91,15 +91,15 @@ function saveChecks() {
   document.querySelectorAll('.ingredient-list li').forEach(li => {
     state[li.id] = li.classList.contains('checked');
   });
-  localStorage.setItem('pare:' + new URL(location.href).searchParams.get('url'), JSON.stringify({t: Date.now(), s: state}));
+  localStorage.setItem('pare:' + location.pathname.slice(1), JSON.stringify({t: Date.now(), s: state}));
 }
 
 function loadChecks() {
   try {
-    const raw = JSON.parse(localStorage.getItem('pare:' + new URL(location.href).searchParams.get('url')) || 'null');
+    const raw = JSON.parse(localStorage.getItem('pare:' + location.pathname.slice(1)) || 'null');
     if (!raw) return;
     if (Date.now() - raw.t > 48 * 60 * 60 * 1000) {
-      localStorage.removeItem('pare:' + new URL(location.href).searchParams.get('url'));
+      localStorage.removeItem('pare:' + location.pathname.slice(1));
       return;
     }
     Object.entries(raw.s).forEach(([id, checked]) => {

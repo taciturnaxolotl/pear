@@ -14,7 +14,7 @@
   </nav>
   <div class="page">
     <div class="error-box">
-      <h3>Could not extract recipe</h3>
+      <h3 id="error-title">Could not extract recipe</h3>
       <p>{{.Error}}</p>
       <p class="error-source">You can view the original page at <a href="{{.SourceURL}}" target="_blank" rel="noopener">{{with cleanSource .SourceURL}}{{.host}}{{if .path}}<span class="source-path">{{.path}}</span>{{end}}{{end}}</a></p>
     </div>
@@ -23,6 +23,22 @@
     <span>made by <a href="https://dunkirk.sh" target="_blank" rel="noopener">Kieran Klukas</a></span>
     <a href="https://tangled.org/dunkirk.sh/pare/commit/{{.GitHash}}" target="_blank" rel="noopener" class="commit-link">{{.GitHash}}</a>
   </footer>
+<script>
+const errorPhrases = [
+  "We burned the water",
+  "The kitchen is on fire",
+  "Someone forgot the baking soda",
+  "The recipe vanished into thin air",
+  "We dropped the souffle",
+  "The dog ate the recipe",
+  "Oops, all garnish",
+  "Lost the recipe in the couch cushions",
+  "Recipe 404: flavor not found",
+  "The recipe is in another castle",
+];
+const title = document.getElementById('error-title');
+title.textContent = errorPhrases[Math.floor(Math.random() * errorPhrases.length)];
+</script>
 </body>
 </html>
 {{end}}

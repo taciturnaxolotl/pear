@@ -1,0 +1,82 @@
+{{define "loading_page"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>pare - extracting…</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/" class="wordmark">pare</a>
+  </nav>
+  <div class="page">
+    <div class="loading-box" id="loading-container">
+      <div class="loading-spinner"></div>
+      <h3 id="loading-title"></h3>
+      <p class="loading-status" id="status-text"></p>
+      <p class="loading-source" id="loading-source"><a href="{{.TargetURL}}" target="_blank" rel="noopener">{{with cleanSource .TargetURL}}{{.host}}{{if .path}}<span class="source-path">{{.path}}</span>{{end}}{{end}}</a></p>
+    </div>
+  </div>
+  <footer>
+    <span>made by <a href="https://dunkirk.sh" target="_blank" rel="noopener">Kieran Klukas</a></span>
+    <a href="https://tangled.org/dunkirk.sh/pare/commit/{{.GitHash}}" target="_blank" rel="noopener" class="commit-link">{{.GitHash}}</a>
+  </footer>
+<script>
+const targetURL = "{{.TargetURL | urlquery}}";
+const statusText = document.getElementById('status-text');
+const loadingTitle = document.getElementById('loading-title');
+let elapsed = 0;
+
+const phrases = [
+  "Preheating the oven",
+  "Gathering ingredients",
+  "Chopping onions (no tears, promise)",
+  "Whisking things together",
+  "Simmering gently",
+  "Zesting a lemon",
+  "Rolling out the dough",
+  "Reducing the sauce",
+  "Tasting as we go",
+  "Plating up",
+  "Adding a pinch of salt",
+  "Letting it rest",
+  "Folding gently",
+  "Checking the oven",
+  "Garnishing with fresh herbs",
+];
+
+let phraseIdx = Math.floor(Math.random() * phrases.length);
+loadingTitle.textContent = phrases[phraseIdx] + '…';
+
+const phraseInterval = setInterval(() => {
+  phraseIdx = (phraseIdx + 1) % phrases.length;
+  loadingTitle.textContent = phrases[phraseIdx] + '…';
+}, 2000);
+
+function poll() {
+  fetch('/status?url=' + targetURL)
+    .then(r => r.json())
+    .then(data => {
+      if (data.ready) {
+        window.location.reload();
+      } else if (data.error) {
+        clearInterval(phraseInterval);
+        window.location.reload();
+      } else {
+        elapsed += 1;
+        setTimeout(poll, 1500);
+      }
+    })
+    .catch(() => {
+      setTimeout(poll, 3000);
+    });
+}
+
+setTimeout(poll, 2000);
+</script>
+</body>
+</html>
+{{end}}

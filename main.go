@@ -4,15 +4,18 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
+	"io/fs"
+	"sync"
 	"log"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
-	"io/fs"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/joho/godotenv"
 
 	"tangled.org/dunkirk.sh/pare/internal/cache"
 	"tangled.org/dunkirk.sh/pare/internal/cooklang"
@@ -24,6 +27,7 @@ import (
 var gitHash = "dev"
 
 func main() {
+	godotenv.Load()
 	port := flag.Int("port", 3000, "port to listen on")
 	dbPath := flag.String("db", "pare.db", "path to SQLite database")
 	baseURL := flag.String("base-url", "", "base URL of this service")
@@ -44,6 +48,7 @@ func main() {
 		"isoToSeconds": isoToSeconds,
 		"cleanSource": cleanSource,
 		"renderStep":  renderStep,
+		"trimProto":   func(s string) string { return strings.TrimPrefix(strings.TrimPrefix(s, "https://"), "http://") },
 	}).ParseFS(ui.Templates, "templates/*.html")
 	if err != nil {
 		log.Fatalf("parsing templates: %v", err)
@@ -55,6 +60,8 @@ func main() {
 		templates: tmpl,
 		baseURL:   *baseURL,
 		gitHash:   gitHash,
+		pending:   make(map[string]chan extractResult),
+		failed:    make(map[string]failedEntry),
 	}
 
 	r := chi.NewRouter()
@@ -68,8 +75,10 @@ func main() {
 	}
 
 	r.Get("/", srv.handleIndex)
-	r.Get("/recipe", srv.handleRecipe)
 	r.Get("/export.cook", srv.handleCookExport)
+	r.Get("/recipe", srv.handleRecipeQuery)
+	r.Get("/status", srv.handleStatus)
+	r.Get("/*", srv.handleRecipePath)
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticContent))))
 
 	addr := fmt.Sprintf(":%d", *port)
@@ -80,56 +89,198 @@ func main() {
 }
 
 type Server struct {
-	pipeline  *extract.Pipeline
-	cache     *cache.Cache
-	templates *template.Template
-	baseURL   string
-	gitHash   string
+	pipeline   *extract.Pipeline
+	cache      *cache.Cache
+	templates  *template.Template
+	baseURL    string
+	gitHash    string
+	pendingMu  sync.Mutex
+	pending    map[string]chan extractResult
+	failedMu   sync.Mutex
+	failed    map[string]failedEntry
+}
+
+type failedEntry struct {
+	msg       string
+	failedAt  time.Time
+}
+
+type extractResult struct {
+	recipe *models.Recipe
+	err    error
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	targetURL := r.URL.Query().Get("url")
 	if targetURL != "" {
-		http.Redirect(w, r, "/recipe?url="+url.QueryEscape(targetURL), http.StatusFound)
+		if strings.HasPrefix(targetURL, "https://") {
+			targetURL = targetURL[8:]
+		} else if strings.HasPrefix(targetURL, "http://") {
+			targetURL = targetURL[7:]
+		}
+		http.Redirect(w, r, "/"+targetURL, http.StatusFound)
 		return
 	}
 	s.templates.ExecuteTemplate(w, "index_page", map[string]string{"GitHash": s.gitHash, "BaseURL": s.baseURL})
 }
 
-func (s *Server) handleRecipe(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleRecipeQuery(w http.ResponseWriter, r *http.Request) {
 	targetURL := r.URL.Query().Get("url")
 	if targetURL == "" {
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
+	if strings.HasPrefix(targetURL, "https://") {
+		targetURL = targetURL[8:]
+	} else if strings.HasPrefix(targetURL, "http://") {
+		targetURL = targetURL[7:]
+	}
+	http.Redirect(w, r, "/"+targetURL, http.StatusMovedPermanently)
+}
 
-	if !strings.HasPrefix(targetURL, "http://") && !strings.HasPrefix(targetURL, "https://") {
-		targetURL = "https://" + targetURL
+func (s *Server) handleRecipePath(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	if path == "/" || path == "" {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+
+	targetURL := "https://" + path[1:]
+
+	recipe, err := s.cache.Get(targetURL)
+	if err != nil {
+		log.Printf("cache read error: %v", err)
+	}
+	if recipe != nil {
+		s.renderRecipe(w, recipe, targetURL)
+		return
+	}
+
+	// Check if extraction already failed (5min TTL)
+	s.failedMu.Lock()
+	entry, alreadyFailed := s.failed[targetURL]
+	s.failedMu.Unlock()
+	if alreadyFailed && time.Since(entry.failedAt) < 5*time.Minute {
+		s.renderError(w, entry.msg, targetURL)
+		return
+	}
+	if alreadyFailed {
+		s.failedMu.Lock()
+		delete(s.failed, targetURL)
+		s.failedMu.Unlock()
+	}
+
+	// Not cached — start extraction if not already in flight
+	s.startExtraction(targetURL)
+
+	// Render loading interstitial
+	data := map[string]interface{}{
+		"TargetURL": targetURL,
+		"GitHash":   s.gitHash,
+		"BaseURL":   s.baseURL,
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	s.templates.ExecuteTemplate(w, "loading_page", data)
+}
+
+func (s *Server) startExtraction(targetURL string) {
+	s.pendingMu.Lock()
+	defer s.pendingMu.Unlock()
+
+	if _, ok := s.pending[targetURL]; ok {
+		return
+	}
+
+	ch := make(chan extractResult, 1)
+	s.pending[targetURL] = ch
+
+	go func() {
+		result := s.pipeline.Extract(targetURL)
+		if result.Error != nil {
+			s.failedMu.Lock()
+			s.failed[targetURL] = failedEntry{msg: result.Error.Error(), failedAt: time.Now()}
+			s.failedMu.Unlock()
+
+			ch <- extractResult{err: result.Error}
+		} else {
+			if err := s.cache.Set(targetURL, result.Recipe); err != nil {
+				log.Printf("cache write error: %v", err)
+			}
+			ch <- extractResult{recipe: result.Recipe}
+		}
+		close(ch)
+
+		s.pendingMu.Lock()
+		delete(s.pending, targetURL)
+		s.pendingMu.Unlock()
+	}()
+}
+
+func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
+	targetURL := r.URL.Query().Get("url")
+	if targetURL == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"ready":false,"error":"missing url"}`))
+		return
 	}
 
 	recipe, err := s.cache.Get(targetURL)
 	if err != nil {
 		log.Printf("cache read error: %v", err)
 	}
-	if recipe == nil {
-		result := s.pipeline.Extract(targetURL)
-		if result.Error != nil {
-			s.renderError(w, result.Error.Error(), targetURL)
-			return
-		}
-		recipe = result.Recipe
-		if err := s.cache.Set(targetURL, recipe); err != nil {
-			log.Printf("cache write error: %v", err)
-		}
+	if recipe != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"ready":true}`))
+		return
 	}
 
+	s.pendingMu.Lock()
+	ch, pending := s.pending[targetURL]
+	s.pendingMu.Unlock()
+	if !pending {
+		// Check if it already failed (5min TTL)
+		s.failedMu.Lock()
+		entry, failed := s.failed[targetURL]
+		s.failedMu.Unlock()
+		if failed {
+			if time.Since(entry.failedAt) < 5*time.Minute {
+				errMsg := strings.ReplaceAll(entry.msg, `"`, `\\"`)
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(fmt.Sprintf(`{"ready":false,"error":"%s"}`, errMsg)))
+				return
+			}
+			s.failedMu.Lock()
+			delete(s.failed, targetURL)
+			s.failedMu.Unlock()
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"ready":false,"error":"extraction not started"}`))
+		return
+	}
+
+	// Non-blocking read from channel
+	select {
+	case res := <-ch:
+		w.Header().Set("Content-Type", "application/json")
+		if res.err != nil {
+			errMsg := strings.ReplaceAll(res.err.Error(), `"`, `\\"`)
+			w.Write([]byte(fmt.Sprintf(`{"ready":false,"error":"%s"}`, errMsg)))
+		} else {
+			w.Write([]byte(`{"ready":true}`))
+		}
+	default:
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"ready":false}`))
+	}
+}
+
+func (s *Server) renderRecipe(w http.ResponseWriter, recipe *models.Recipe, targetURL string) {
 	data := map[string]interface{}{
 		"Recipe":     recipe,
 		"TargetURL": targetURL,
 		"GitHash":    s.gitHash,
 		"BaseURL":    s.baseURL,
 	}
-
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	s.templates.ExecuteTemplate(w, "recipe_page", data)
 }
@@ -139,6 +290,9 @@ func (s *Server) handleCookExport(w http.ResponseWriter, r *http.Request) {
 	if targetURL == "" {
 		http.Error(w, "missing url parameter", http.StatusBadRequest)
 		return
+	}
+	if !strings.HasPrefix(targetURL, "http://") && !strings.HasPrefix(targetURL, "https://") {
+		targetURL = "https://" + targetURL
 	}
 
 	recipe, err := s.cache.Get(targetURL)

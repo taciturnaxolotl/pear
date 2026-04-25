@@ -34,7 +34,7 @@
             vendorHash = "sha256-qnvBWpHLZZq0R8QEhDJeclVlHEbnru6v2RkPnKIGMAY=";
 
             ldflags = [
-              "-X main.gitHash=${self.shortRev or self.dirtyShortRev or "dev"}"
+              "-X main.gitHash=${self.rev or self.dirtyRev or "dev"}"
             ];
 
             meta = with pkgs.lib; {

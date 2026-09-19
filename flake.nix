@@ -31,7 +31,7 @@
 
             src = ./.;
 
-            vendorHash = "sha256-qnvBWpHLZZq0R8QEhDJeclVlHEbnru6v2RkPnKIGMAY=";
+            vendorHash = "sha256-gbyoBu/z42xmyZlRhEcMU3cSEhWO8O5kAenOkfA8uW4=";
 
             ldflags = [
               "-X main.gitHash=${self.rev or self.dirtyRev or "dev"}"

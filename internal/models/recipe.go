@@ -2,6 +2,7 @@ package models
 
 import (
 	"html"
+	"regexp"
 	"time"
 )
 
@@ -41,15 +42,28 @@ type CachedRecipe struct {
 	FetchedAt  time.Time
 }
 
+// doubledParens matches a parenthesised note wrapped in a second, redundant
+// pair, like "((or lemon juice))". Recipe plugins produce these when an author
+// already bracketed a note and the plugin adds its own brackets while building
+// the machine-readable copy of the recipe; the page itself renders the note
+// correctly, so only the data we consume is affected. The inner group must be
+// bracket-free, which leaves real nesting such as "(2 cups (packed))" alone.
+var doubledParens = regexp.MustCompile(`\(\(([^()]*)\)\)`)
+
+func tidyText(s string) string {
+	s = html.UnescapeString(s)
+	return doubledParens.ReplaceAllString(s, "($1)")
+}
+
 func (r *Recipe) Normalize() {
-	r.Name = html.UnescapeString(r.Name)
-	r.Description = html.UnescapeString(r.Description)
+	r.Name = tidyText(r.Name)
+	r.Description = tidyText(r.Description)
 	for i := range r.Ingredients {
-		r.Ingredients[i].RawText = html.UnescapeString(r.Ingredients[i].RawText)
-		r.Ingredients[i].Name = html.UnescapeString(r.Ingredients[i].Name)
-		r.Ingredients[i].Group = html.UnescapeString(r.Ingredients[i].Group)
+		r.Ingredients[i].RawText = tidyText(r.Ingredients[i].RawText)
+		r.Ingredients[i].Name = tidyText(r.Ingredients[i].Name)
+		r.Ingredients[i].Group = tidyText(r.Ingredients[i].Group)
 	}
 	for i := range r.Instructions {
-		r.Instructions[i].Text = html.UnescapeString(r.Instructions[i].Text)
+		r.Instructions[i].Text = tidyText(r.Instructions[i].Text)
 	}
 }

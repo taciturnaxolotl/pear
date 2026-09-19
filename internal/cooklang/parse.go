@@ -214,7 +214,7 @@ func regexRender(text string) template.HTML {
 		display := qty + " " + unit
 		qtyInt, _ := strconv.Atoi(qty)
 		secs := timerSeconds(float64(qtyInt), unit)
-		return fmt.Sprintf(`<span class="tmr" data-seconds="%d">%s</span>`, secs, escHTML(display))
+		return timerSpan(secs, display)
 	})
 
 	// Replace time ranges like "2-3 minutes"
@@ -225,7 +225,7 @@ func regexRender(text string) template.HTML {
 			unit := parts[2]
 			display := qty + " " + unit
 			secs := timeRangeSeconds(qty, unit)
-			return fmt.Sprintf(`<span class="tmr" data-seconds="%d">%s</span>`, secs, escHTML(display))
+			return timerSpan(secs, display)
 		}
 		return match
 	})
@@ -281,7 +281,7 @@ func renderStep(step cooklang.Step, sb *strings.Builder) {
 			spans = append(spans, htmlSpan{
 				start: idx,
 				end:   idx + len(search),
-				html:  fmt.Sprintf(`<span class="tmr" data-seconds="%d">%s</span>`, secs, escHTML(display)),
+				html:  timerSpan(secs, display),
 			})
 		}
 	}
@@ -298,7 +298,7 @@ func renderStep(step cooklang.Step, sb *strings.Builder) {
 		spans = append(spans, htmlSpan{
 			start: fullStart,
 			end:   fullEnd,
-			html:  fmt.Sprintf(`<span class="tmr" data-seconds="%d">%s</span>`, secs, escHTML(display)),
+			html:  timerSpan(secs, display),
 		})
 	}
 
@@ -346,6 +346,20 @@ func formatTimerSearch(duration float64, unit string) string {
 		return s + " " + unit
 	}
 	return s
+}
+
+// maxTimerSeconds is the longest duration we offer a countdown for. Nobody
+// watches a five hour brine tick down in a browser tab, so past this point the
+// duration is left as plain text.
+const maxTimerSeconds = 5 * 3600
+
+// timerSpan renders a clickable timer, or plain text when a countdown would be
+// useless: zero-length, or long enough to be a calendar problem.
+func timerSpan(secs int, display string) string {
+	if secs <= 0 || secs > maxTimerSeconds {
+		return escHTML(display)
+	}
+	return fmt.Sprintf(`<span class="tmr" data-seconds="%d">%s</span>`, secs, escHTML(display))
 }
 
 func timerSeconds(duration float64, unit string) int {

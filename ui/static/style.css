@@ -297,11 +297,13 @@ footer a:hover{color:var(--accent)}
   cursor:pointer;
   touch-action:manipulation;
   user-select:none;
-  transition:background 0.15s,color 0.15s,border-color 0.15s;
+  transition:background 0.15s,color 0.15s,border-color 0.15s,opacity 0.2s,visibility 0.2s;
 }
 .timer-step:hover{background:var(--btn-hover);color:var(--text)}
 .timer-step:active{border-color:var(--accent);color:var(--accent)}
-.timer-alarming .timer-step{opacity:0.35;pointer-events:none}
+/* nothing to adjust once the clock is running; keep the space so the
+   countdown does not jump sideways as they go */
+.timer-locked .timer-step{opacity:0;visibility:hidden;pointer-events:none}
 .timer-display{
   display:flex;
   align-items:baseline;
@@ -327,11 +329,20 @@ footer a:hover{color:var(--accent)}
   color:inherit;
   font-variant-numeric:tabular-nums;
   border-radius:4px;
-  transition:color 0.15s,opacity 0.15s;
 }
 .timer-seg:focus{outline:none;color:var(--accent)}
 .timer-seg.seg-idle{opacity:0.3}
 .timer-seg:focus.seg-idle{opacity:1}
+/* the segments are disabled while the clock runs, so they cannot take focus,
+   a caret or the accent colour; keep them looking like the readout they are
+   rather than a greyed-out dead input */
+.timer-seg:disabled{
+  color:inherit;
+  opacity:1;
+  cursor:default;
+  -webkit-text-fill-color:currentColor;
+}
+.timer-seg:disabled.seg-idle{opacity:0.3}
 .timer-locked .timer-seg{cursor:default}
 .timer-colon{opacity:0.3}
 .timer-done{color:var(--accent);animation:pulse 1s ease-in-out infinite}

@@ -192,12 +192,13 @@ segs.forEach((seg, i) => {
     if (digits.length === 2 && i < 2) segs[i + 1].focus();
   });
   seg.addEventListener('keydown', e => {
+    // belt and braces: the fields are disabled mid-run, so this cannot fire
+    if (timerRunning || timerAlarming) { e.preventDefault(); return; }
     const atStart = seg.selectionStart === 0 && seg.selectionEnd === 0;
     const atEnd = seg.selectionStart === seg.value.length;
     if (e.key === 'Enter') {
       e.preventDefault();
-      seg.blur();
-      startTimer();
+      seg.blur(); // confirm the value; starting is the button's job
     } else if (e.key === 'Escape') {
       e.preventDefault();
       renderSegments(timerRemaining);
@@ -256,7 +257,7 @@ function stepFor(secs) {
 }
 
 function stepTimer(dir) {
-  if (timerAlarming) return;
+  if (timerRunning || timerAlarming) return;
   const step = dir > 0 ? stepFor(timerRemaining) : stepFor(timerRemaining - 1);
   const next = dir > 0
     ? Math.floor(timerRemaining / step) * step + step
@@ -264,13 +265,13 @@ function stepTimer(dir) {
   setDuration(Math.max(0, Math.min(TIMER_MAX, next)));
 }
 
-// While stopped, a new duration is also the one Reset returns to.
-// While running, it only shifts what is left.
+// Changing the duration always yields a fresh timer rather than a half-finished
+// one, so editing a paused clock drops the leftover time and starts over.
 function setDuration(secs) {
   timerRemaining = secs;
-  if (!timerRunning) timerInitial = secs;
-  else if (timerRemaining > TICK_LEAD) stopTick();
-  else startTick();
+  timerInitial = secs;
+  stopTick();
+  timerToggle.textContent = 'Start';
   renderSegments(timerRemaining);
 }
 
@@ -317,10 +318,11 @@ function openTimer(secs, label) {
 
 function setSegmentsEditable(on) {
   segs.forEach(seg => {
-    seg.readOnly = !on;
-    // drop focus when locking, or the segment keeps its accent colour and
-    // reads as editable while the clock is running
+    // blur before disabling, while the handler can still run and bail cleanly
     if (!on && document.activeElement === seg) seg.blur();
+    // disabled rather than readOnly: a readOnly field still takes focus and a
+    // selection highlight, so a running clock looked editable when clicked
+    seg.disabled = !on;
   });
   timerWidget.classList.toggle('timer-locked', !on);
 }

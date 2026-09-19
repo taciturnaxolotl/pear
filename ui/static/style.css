@@ -251,11 +251,11 @@ footer a:hover{color:var(--accent)}
   margin-bottom:2rem;
   padding:1rem 1.25rem;
 }
-}
 .timer-header{
   display:flex;
   justify-content:space-between;
   align-items:center;
+  gap:0.5rem;
   margin-bottom:0.5rem;
 }
 .timer-label{
@@ -265,15 +265,75 @@ footer a:hover{color:var(--accent)}
   letter-spacing:0.08em;
   color:var(--text-muted);
 }
+.timer-close{
+  border:0;
+  background:none;
+  padding:0;
+  line-height:1;
+  font-size:1.15rem;
+  color:var(--text-muted);
+  cursor:pointer;
+  transition:color 0.15s;
+}
+.timer-close:hover{color:var(--accent)}
+.timer-edit{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:0.5rem;
+  margin-bottom:0.75rem;
+}
+.timer-step{
+  flex:none;
+  width:2.25rem;
+  height:2.25rem;
+  border:1px solid var(--border);
+  border-radius:50%;
+  background:var(--surface);
+  font-family:'Poppins',system-ui,sans-serif;
+  font-size:1.2rem;
+  line-height:1;
+  color:var(--text-muted);
+  cursor:pointer;
+  touch-action:manipulation;
+  user-select:none;
+  transition:background 0.15s,color 0.15s,border-color 0.15s;
+}
+.timer-step:hover{background:var(--btn-hover);color:var(--text)}
+.timer-step:active{border-color:var(--accent);color:var(--accent)}
+.timer-alarming .timer-step{opacity:0.35;pointer-events:none}
 .timer-display{
+  display:flex;
+  align-items:baseline;
+  justify-content:center;
   font-family:'Poppins',system-ui,sans-serif;
   font-size:2.75rem;
   font-weight:700;
   letter-spacing:-0.03em;
   line-height:1;
-  margin-bottom:0.75rem;
   color:var(--text);
+  font-variant-numeric:tabular-nums;
 }
+.timer-seg{
+  width:2ch;
+  border:0;
+  background:none;
+  padding:0;
+  appearance:none;
+  -webkit-appearance:none;
+  text-align:center;
+  font:inherit;
+  letter-spacing:inherit;
+  color:inherit;
+  font-variant-numeric:tabular-nums;
+  border-radius:4px;
+  transition:color 0.15s,opacity 0.15s;
+}
+.timer-seg:focus{outline:none;color:var(--accent)}
+.timer-seg.seg-idle{opacity:0.3}
+.timer-seg:focus.seg-idle{opacity:1}
+.timer-locked .timer-seg{cursor:default}
+.timer-colon{opacity:0.3}
 .timer-done{color:var(--accent);animation:pulse 1s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 .timer-controls{
@@ -292,7 +352,8 @@ footer a:hover{color:var(--accent)}
   color:var(--text-muted);
   transition:background 0.15s,color 0.15s,border-color 0.15s;
 }
-.timer-running #timer-toggle{
+.timer-running #timer-toggle,
+.timer-alarming #timer-toggle{
   border-color:var(--accent);
   background:var(--accent);
   color:#fff;
@@ -495,6 +556,8 @@ footer a:hover{color:var(--accent)}
   .actions{flex-direction:column}
   .actions a,.actions button{width:100%;justify-content:center}
   .timer-display{font-size:2.25rem}
+  /* 44px, the smallest comfortable touch target */
+  .timer-step{width:2.75rem;height:2.75rem;font-size:1.35rem}
   .instruction-list li{padding-left:1.5rem}
 }
 

@@ -66,8 +66,19 @@
 <div id="timer-widget" class="timer-widget">
   <div class="timer-header">
     <span class="timer-label" id="timer-label"></span>
+    <button class="timer-close" id="timer-close" onclick="closeTimer()" aria-label="Close timer">&times;</button>
   </div>
-  <div class="timer-display" id="timer-display">00:00</div>
+  <div class="timer-edit">
+    <button class="timer-step" id="timer-minus" aria-label="Less time">&minus;</button>
+    <div class="timer-display" id="timer-display">
+      <input class="timer-seg" id="seg-h" inputmode="numeric" maxlength="2" value="00" aria-label="Hours">
+      <span class="timer-colon">:</span>
+      <input class="timer-seg" id="seg-m" inputmode="numeric" maxlength="2" value="00" aria-label="Minutes">
+      <span class="timer-colon">:</span>
+      <input class="timer-seg" id="seg-s" inputmode="numeric" maxlength="2" value="00" aria-label="Seconds">
+    </div>
+    <button class="timer-step" id="timer-plus" aria-label="More time">+</button>
+  </div>
   <div class="timer-controls">
     <button class="timer-btn" id="timer-toggle" onclick="toggleTimer()">Start</button>
     <button class="timer-btn" id="timer-reset" onclick="resetTimer()">Reset</button>
@@ -146,67 +157,209 @@ function loadChecks() {
 loadChecks();
 
 // Timer
+const TICK_LEAD = 5;       // tick.m4a is exactly this long, played once
+const TIMER_MAX = 359999;  // 99:59:59
 let timerInterval = null;
 let timerRemaining = 0;
+let timerInitial = 0;
 let timerRunning = false;
-let timerSound = null;
-let timerSoundPlayed = false;
+let timerAlarming = false;
+let tickSound = null;
+let ringSound = null;
+let tickPlaying = false;
+
+const timerWidget = document.getElementById('timer-widget');
+const timerDisplay = document.getElementById('timer-display');
+const timerToggle = document.getElementById('timer-toggle');
+const timerLabelEl = document.getElementById('timer-label');
+const segs = ['seg-h', 'seg-m', 'seg-s'].map(id => document.getElementById(id));
+const SEG_MAX = [99, 59, 59];
 
 document.querySelectorAll('.tmr').forEach(el => {
   el.addEventListener('click', () => {
     const secs = parseInt(el.dataset.seconds, 10);
-    const label = el.textContent;
-    if (secs > 0) {
-      openTimer(secs, label);
+    if (secs > 0) openTimer(secs, el.textContent);
+  });
+});
+
+segs.forEach((seg, i) => {
+  if (!seg) return;
+  seg.addEventListener('focus', () => seg.select());
+  seg.addEventListener('blur', commitEdit);
+  seg.addEventListener('input', () => {
+    const digits = seg.value.replace(/\D/g, '').slice(0, 2);
+    seg.value = digits;
+    if (digits.length === 2 && i < 2) segs[i + 1].focus();
+  });
+  seg.addEventListener('keydown', e => {
+    const atStart = seg.selectionStart === 0 && seg.selectionEnd === 0;
+    const atEnd = seg.selectionStart === seg.value.length;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      seg.blur();
+      startTimer();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      renderSegments(timerRemaining);
+      seg.blur();
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const span = SEG_MAX[i] + 1;
+      const cur = parseInt(seg.value, 10) || 0;
+      const next = (cur + (e.key === 'ArrowUp' ? 1 : -1) + span) % span;
+      seg.value = String(next).padStart(2, '0');
+      seg.select();
+      commitEdit();
+    } else if (e.key === 'ArrowLeft' && atStart && i > 0) {
+      e.preventDefault();
+      segs[i - 1].focus();
+    } else if (e.key === 'ArrowRight' && atEnd && i < 2) {
+      e.preventDefault();
+      segs[i + 1].focus();
+    } else if (e.key === 'Backspace' && seg.value === '' && i > 0) {
+      e.preventDefault();
+      segs[i - 1].focus();
     }
   });
 });
 
-function openTimer(secs, label) {
+bindStepper(document.getElementById('timer-minus'), -1);
+bindStepper(document.getElementById('timer-plus'), 1);
+
+// Press to nudge, hold to run. Accelerates so a 40 minute timer isn't 40 taps.
+function bindStepper(btn, dir) {
+  if (!btn) return;
+  let timer = null, count = 0;
+  const fire = () => {
+    stepTimer(dir);
+    count++;
+    timer = setTimeout(fire, count < 4 ? 260 : count < 12 ? 120 : 60);
+  };
+  const stop = () => { clearTimeout(timer); timer = null; count = 0; };
+  btn.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    stepTimer(dir);
+    count = 1;
+    timer = setTimeout(fire, 450);
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, stop));
+}
+
+// Step size follows magnitude, and snaps to the next round multiple so
+// 4:37 + a nudge lands on 5:00 rather than 5:37. Stepping down sizes off the
+// value being moved toward, so 1:00 goes down to 0:50 and up to 2:00 rather
+// than landing on a lumpy 1:10 either way.
+function stepFor(secs) {
+  if (secs < 60) return 10;
+  if (secs < 3600) return 60;
+  return 300;
+}
+
+function stepTimer(dir) {
+  if (timerAlarming) return;
+  const step = dir > 0 ? stepFor(timerRemaining) : stepFor(timerRemaining - 1);
+  const next = dir > 0
+    ? Math.floor(timerRemaining / step) * step + step
+    : Math.ceil(timerRemaining / step) * step - step;
+  setDuration(Math.max(0, Math.min(TIMER_MAX, next)));
+}
+
+// While stopped, a new duration is also the one Reset returns to.
+// While running, it only shifts what is left.
+function setDuration(secs) {
   timerRemaining = secs;
-  timerRunning = false;
-  timerSoundPlayed = false;
+  if (!timerRunning) timerInitial = secs;
+  else if (timerRemaining > TICK_LEAD) stopTick();
+  else startTick();
+  renderSegments(timerRemaining);
+}
+
+function readSegments() {
+  const v = segs.map((seg, i) => Math.min(SEG_MAX[i], parseInt(seg.value, 10) || 0));
+  return Math.min(TIMER_MAX, v[0] * 3600 + v[1] * 60 + v[2]);
+}
+
+function renderSegments(secs) {
+  secs = Math.max(0, Math.min(TIMER_MAX, secs));
+  const parts = [Math.floor(secs / 3600), Math.floor((secs % 3600) / 60), secs % 60];
+  let leading = true;
+  parts.forEach((p, i) => {
+    segs[i].value = String(p).padStart(2, '0');
+    // grey out the leading 00 groups so the eye lands on what matters
+    leading = leading && p === 0 && i < 2;
+    segs[i].classList.toggle('seg-idle', leading);
+  });
+}
+
+function commitEdit() {
+  if (timerRunning || timerAlarming) return;
+  const typed = readSegments();
+  if (typed !== timerRemaining) setDuration(typed);
+  else renderSegments(timerRemaining); // re-pad what the user half-typed
+}
+
+function openTimer(secs, label) {
   clearInterval(timerInterval);
   timerInterval = null;
-  if (!timerSound) timerSound = new Audio('/static/timer.mp3');
-  timerSound.pause();
-  timerSound.currentTime = 0;
-  document.getElementById('timer-label').textContent = label;
+  timerRunning = false;
+  stopTick();
+  stopAlarm();
+  timerRemaining = Math.min(TIMER_MAX, secs);
+  timerInitial = timerRemaining;
+  loadSounds();
+  timerLabelEl.textContent = label;
+  setSegmentsEditable(true);
+  timerToggle.textContent = 'Start';
+  timerWidget.classList.remove('timer-running');
+  timerWidget.classList.add('timer-open');
   updateTimerDisplay();
-  document.getElementById('timer-toggle').textContent = 'Start';
-  document.getElementById('timer-widget').classList.add('timer-open');
+}
+
+function setSegmentsEditable(on) {
+  segs.forEach(seg => {
+    seg.readOnly = !on;
+    // drop focus when locking, or the segment keeps its accent colour and
+    // reads as editable while the clock is running
+    if (!on && document.activeElement === seg) seg.blur();
+  });
+  timerWidget.classList.toggle('timer-locked', !on);
+}
+
+function loadSounds() {
+  if (tickSound) return;
+  // One contiguous recording rather than a short loop: looping a second of
+  // ticks put an audible seam in the rhythm every time it wrapped.
+  tickSound = new Audio('/static/tick.m4a');
+  ringSound = new Audio('/static/ring.m4a');
+  ringSound.loop = true;
 }
 
 function toggleTimer() {
-  if (timerRunning) {
-    pauseTimer();
-  } else {
-    startTimer();
-  }
+  if (timerAlarming) resetTimer();
+  else if (timerRunning) pauseTimer();
+  else startTimer();
 }
 
 function startTimer() {
-  if (timerRunning) return;
+  if (timerRunning || timerAlarming) return;
+  commitEdit();
+  if (timerRemaining <= 0) return;
   timerRunning = true;
-  document.getElementById('timer-toggle').textContent = 'Pause';
-  document.getElementById('timer-widget').classList.add('timer-running');
+  setSegmentsEditable(false);
+  timerToggle.textContent = 'Pause';
+  timerWidget.classList.add('timer-running');
+  if (timerRemaining <= TICK_LEAD) startTick();
   timerInterval = setInterval(() => {
     timerRemaining--;
     updateTimerDisplay();
-    if (timerRemaining === 2 && !timerSoundPlayed) {
-      timerSoundPlayed = true;
-      timerSound.play();
-    }
+    if (timerRemaining <= TICK_LEAD && timerRemaining > 0) startTick();
     if (timerRemaining <= 0) {
       clearInterval(timerInterval);
       timerInterval = null;
       timerRunning = false;
-      document.getElementById('timer-toggle').textContent = 'Start';
-      document.getElementById('timer-display').classList.add('timer-done');
-      document.getElementById('timer-widget').classList.remove('timer-running');
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('Timer done!', { body: document.getElementById('timer-label').textContent + ' is done!' });
-      }
+      timerWidget.classList.remove('timer-running');
+      stopTick();
+      startAlarm();
     }
   }, 1000);
 }
@@ -215,61 +368,72 @@ function pauseTimer() {
   timerRunning = false;
   clearInterval(timerInterval);
   timerInterval = null;
-  document.getElementById('timer-toggle').textContent = 'Unpause';
-  document.getElementById('timer-widget').classList.remove('timer-running');
+  stopTick();
+  setSegmentsEditable(true);
+  timerToggle.textContent = 'Unpause';
+  timerWidget.classList.remove('timer-running');
+}
+
+// Seek so the clip always lands its final tick on zero, whether it starts at
+// T-5, resumes from a pause, or opens on a timer shorter than the lead.
+function startTick() {
+  if (!tickSound || tickPlaying) return;
+  tickPlaying = true;
+  tickSound.currentTime = Math.max(0, TICK_LEAD - timerRemaining);
+  tickSound.play().catch(() => {});
+}
+
+function stopTick() {
+  if (!tickSound) return;
+  tickPlaying = false;
+  tickSound.pause();
+  tickSound.currentTime = 0;
+}
+
+function startAlarm() {
+  timerAlarming = true;
+  timerWidget.classList.add('timer-alarming');
+  timerDisplay.classList.add('timer-done');
+  timerToggle.textContent = 'Stop';
+  if (ringSound) {
+    ringSound.currentTime = 0;
+    ringSound.play().catch(() => {});
+  }
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('Timer done!', { body: timerLabelEl.textContent + ' is done!' });
+  }
+}
+
+function stopAlarm() {
+  timerAlarming = false;
+  timerWidget.classList.remove('timer-alarming');
+  timerDisplay.classList.remove('timer-done');
+  if (ringSound) {
+    ringSound.pause();
+    ringSound.currentTime = 0;
+  }
 }
 
 function resetTimer() {
   clearInterval(timerInterval);
   timerInterval = null;
   timerRunning = false;
-  timerSoundPlayed = false;
-  if (timerSound) { timerSound.pause(); timerSound.currentTime = 0; }
-  const triggers = document.querySelectorAll('.tmr');
-  if (triggers.length > 0) {
-    const active = [...triggers].find(t => t.textContent === document.getElementById('timer-label').textContent);
-    if (active) {
-      timerRemaining = parseInt(active.dataset.seconds, 10);
-    }
-  }
-  document.getElementById('timer-toggle').textContent = 'Start';
-  document.getElementById('timer-display').classList.remove('timer-done');
-  document.getElementById('timer-widget').classList.remove('timer-running');
+  stopTick();
+  stopAlarm();
+  timerRemaining = timerInitial;
+  setSegmentsEditable(true);
+  timerToggle.textContent = 'Start';
+  timerWidget.classList.remove('timer-running');
   updateTimerDisplay();
 }
 
 function closeTimer() {
-  clearInterval(timerInterval);
-  timerInterval = null;
-  timerRunning = false;
-  timerSoundPlayed = false;
-  if (timerSound) { timerSound.pause(); timerSound.currentTime = 0; }
-  document.getElementById('timer-widget').classList.remove('timer-open');
-  document.getElementById('timer-display').classList.remove('timer-done');
-  document.getElementById('timer-widget').classList.remove('timer-running');
-  timerRemaining = 0;
-  updateTimerDisplay();
+  resetTimer();
+  timerWidget.classList.remove('timer-open');
 }
 
 function updateTimerDisplay() {
-  const h = Math.floor(timerRemaining / 3600);
-  const m = Math.floor((timerRemaining % 3600) / 60);
-  const s = timerRemaining % 60;
-  const mStr = String(m).padStart(2, '0');
-  const sStr = String(s).padStart(2, '0');
-  if (h > 0) {
-    const d = Math.floor(h / 24);
-    const hRem = h % 24;
-    if (d > 0) {
-      document.getElementById('timer-display').textContent =
-        d + 'd ' + String(hRem).padStart(2, '0') + ':' + mStr + ':' + sStr;
-    } else {
-      document.getElementById('timer-display').textContent =
-        String(h).padStart(2, '0') + ':' + mStr + ':' + sStr;
-    }
-  } else {
-    document.getElementById('timer-display').textContent = mStr + ':' + sStr;
-  }
+  renderSegments(timerRemaining);
 }
 
 if ('Notification' in window && Notification.permission === 'default') {

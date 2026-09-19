@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"mime"
 	"sync"
 	"log"
 	"net/http"
@@ -81,6 +82,12 @@ func main() {
 	staticContent, err := fs.Sub(ui.Static, "static")
 	if err != nil {
 		log.Fatalf("failed to get static fs: %v", err)
+	}
+
+	// Go's builtin table has no .m4a entry, so slim images would serve the timer
+	// sounds as application/octet-stream and browsers refuse to play them.
+	if err := mime.AddExtensionType(".m4a", "audio/mp4"); err != nil {
+		log.Fatalf("failed to register m4a mime type: %v", err)
 	}
 
 	r.Get("/", srv.handleIndex)

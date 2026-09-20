@@ -344,7 +344,10 @@ footer a:hover{color:var(--accent)}
 }
 .timer-seg:disabled.seg-idle{opacity:0.3}
 .timer-locked .timer-seg{cursor:default}
-.timer-colon{opacity:0.3}
+/* a separator takes the weight of the group on its left, so it stays faint
+   while trailing a dimmed 00 and firms up between two live numbers */
+.timer-colon{opacity:0.7}
+.timer-colon.colon-idle{opacity:0.3}
 .timer-done{color:var(--accent);animation:pulse 1s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 .timer-controls{

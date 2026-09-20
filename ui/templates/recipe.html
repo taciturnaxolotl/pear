@@ -173,6 +173,7 @@ const timerDisplay = document.getElementById('timer-display');
 const timerToggle = document.getElementById('timer-toggle');
 const timerLabelEl = document.getElementById('timer-label');
 const segs = ['seg-h', 'seg-m', 'seg-s'].map(id => document.getElementById(id));
+const colons = [...document.querySelectorAll('.timer-colon')];
 const SEG_MAX = [99, 59, 59];
 
 document.querySelectorAll('.tmr').forEach(el => {
@@ -289,6 +290,9 @@ function renderSegments(secs) {
     // grey out the leading 00 groups so the eye lands on what matters
     leading = leading && p === 0 && i < 2;
     segs[i].classList.toggle('seg-idle', leading);
+    // each separator follows the group on its left, so a colon only stays
+    // faint while it is trailing a dimmed 00
+    if (colons[i]) colons[i].classList.toggle('colon-idle', leading);
   });
 }
 
